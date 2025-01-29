@@ -1,0 +1,8 @@
+colorama
+comtypes
+concurrent_log_handler
+pywin32
+PyYAML
+tabulate
+streamlit
+plotly
