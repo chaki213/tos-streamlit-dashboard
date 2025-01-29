@@ -2,7 +2,8 @@
 
 A real-time options gamma exposure dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 
-Credit to [Tifoji](https://github.com/tifoji/pyrtdc/) for his pyrtdc project.
+## Dashboard Preview
+![Dashboard Preview](view.png)
 
 ## Features
 
@@ -50,3 +51,6 @@ streamlit run app.py
 
 - Updates every 3 seconds
 - Gamma values are displayed in millions of dollars per 1% move
+
+## Credit
+https://x.com/FollowerOfFlow for his [pyrtd](https://github.com/tifoji/pyrtdc/) project.
