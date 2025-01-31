@@ -355,9 +355,10 @@ class RTDClient(COMObject):
                 self._latest_values[key] = quote
                 value_changed = old_value != quote.value
 
-            if value_changed:
+            # Commenting this out for now. 
+            """ if value_changed:
                 timestamp = datetime.now().strftime("%H:%M:%S")
-                self.logger.quote(f"[{timestamp}] LIVE {symbol} {quote_type}: {str(quote)}")
+                self.logger.quote(f"[{timestamp}] LIVE {symbol} {quote_type}: {str(quote)}") """
             
         except Exception as e:
             self.logger.error(f"Error handling quote update: {e}")

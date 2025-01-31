@@ -53,4 +53,4 @@ streamlit run app.py
 - Gamma values are displayed in millions of dollars per 1% move
 
 ## Credit
-https://x.com/FollowerOfFlow for his [pyrtd](https://github.com/tifoji/pyrtdc/) project.
+https://x.com/FollowerOfFlow for his [pyrtdc](https://github.com/tifoji/pyrtdc/) project.
