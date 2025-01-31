@@ -34,11 +34,12 @@ streamlit run app.py
 
 ## Interface Controls
 
-- **Symbol**: Enter the ticker symbol (e.g., "SPY")
-- **Expiry Date**: Select option expiration date (Defaults to the nearest Friday)
-- **Strike Range**: Set the range of strikes to monitor (Defaults to +- $10)
-- **Strike Spacing**: Set the spacing between strikes (Defaults to 1)
-- **Refresh Rate**: Set the data refresh rate (Defaults to 15 seconds)
+
+- **Symbol**: Ticker symbol (e.g., "SPY")
+- **Expiry Date**:  Contract expiration date (Defaults to the nearest Friday)
+- **Strike Range**: Range of strikes to monitor (Defaults to +- $10)
+- **Strike Spacing**: Spacing between strikes (Defaults to 1)
+- **Refresh Rate**: Data refresh rate (Defaults to 15 seconds)
 - **Start/Stop**: Toggle data streaming
 
 ## Notes
@@ -49,6 +50,11 @@ streamlit run app.py
 ## Credit
 Backend:
 
-https://x.com/FollowerOfFlow worked some magic to get RTD working directly with Python.
+[@FollowerOfFlow](https://x.com/FollowerOfFlow) worked some magic to get TOS RTD working directly with Python.
 
 Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
+
+## Support
+[@2187Nick](https://x.com/2187Nick)
+
+[Discord](https://discord.com/invite/vxKepZ6XNC)
