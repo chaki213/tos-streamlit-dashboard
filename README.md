@@ -1,15 +1,10 @@
 # TOS Streamlit Dashboard
 
-A real-time options gamma exposure dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
+A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 
-## Dashboard Preview
-![Dashboard Preview](view.png)
+## Demo
+https://github.com/user-attachments/assets/1d6446e0-5c49-4208-872f-f63a55da36a5
 
-## Features
-
-- Real-time price updates
-- Live visualizations
-- Interactive Plotly charts
 
 ## Prerequisites
 
@@ -35,22 +30,25 @@ pip install -r requirements.txt
 ```bash
 streamlit run app.py
 ```
-3. Enter a symbol (e.g., "SPY")
-4. Select expiry date
-5. Set strike range
-6. Click "Start" to begin real-time monitoring
+3. Open the browser and navigate to `http://localhost:8501`
 
 ## Interface Controls
 
-- **Symbol**: Enter the ticker symbol
-- **Expiry Date**: Select option expiration date
-- **Strike Range**: Set the range of strikes to monitor (±)
+- **Symbol**: Enter the ticker symbol (e.g., "SPY")
+- **Expiry Date**: Select option expiration date (Defaults to the nearest Friday)
+- **Strike Range**: Set the range of strikes to monitor (Defaults to +- $10)
+- **Strike Spacing**: Set the spacing between strikes (Defaults to 1)
+- **Refresh Rate**: Set the data refresh rate (Defaults to 15 seconds)
 - **Start/Stop**: Toggle data streaming
 
 ## Notes
 
-- Updates every 3 seconds
-- Gamma values are displayed in millions of dollars per 1% move
+- This does work with Ondemand. Can use this on weekends to review historical data.
+- Gamma values are displayed in millions of dollars per 1% move in underlying asset
 
 ## Credit
-https://x.com/FollowerOfFlow for his [pyrtdc](https://github.com/tifoji/pyrtdc/) project.
+Backend:
+
+https://x.com/FollowerOfFlow worked some magic to get RTD working directly with Python.
+
+Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
