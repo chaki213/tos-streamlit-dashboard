@@ -1,3 +1,4 @@
+# src/rtd/rtd_worker.py
 import pythoncom
 import time
 import threading
@@ -11,75 +12,64 @@ class RTDWorker:
         self.data_queue = data_queue
         self.stop_event = stop_event
         self.client = None
-
-    def subscribe_additional_symbols(self, symbols: list) -> int:
-        """Add new symbol subscriptions to existing RTD client."""
-        success_count = 0
-        for symbol in symbols:
-            try:
-                if symbol.startswith('.'):
-                    if self.client.subscribe(QuoteType.GAMMA, symbol):
-                        success_count += 1
-                    if self.client.subscribe(QuoteType.OPEN_INT, symbol):
-                        success_count += 1
-                else:
-                    print(f"Subscribing to LAST for {symbol}")
-                    if self.client.subscribe(QuoteType.LAST, symbol):
-                        success_count += 1
-            except Exception as sub_error:
-                print(f"Error subscribing to {symbol}: {str(sub_error)}")
+        self.initialized = False
         
-        print(f"Successfully subscribed to {success_count} additional topics")
-        return success_count
-
-    def start(self, symbols: list):
+    def start(self, all_symbols: list):
+        """Start RTD worker with all symbols at once"""
         try:
-            # We need this because RTDWorker runs in its own thread
+            if self.initialized:
+                print("Cleaning up previous instance...")
+                self.cleanup()
+                #time.sleep(.2)  # 1 Wait for proper cleanup
+                
             pythoncom.CoInitialize()
+            time.sleep(0.1)  # Increased delay for COM initialization
             
-            # Increase initialization delay
-            #print("RTD Worker: Sleeping for .1 seconds...")
-            time.sleep(.2) # .1 seconds does work but lets go with .2 for now
-            
-            #print("RTD Worker: Creating RTDClient...")
             self.client = RTDClient(heartbeat_ms=SETTINGS['timing']['initial_heartbeat'])
             self.client.initialize()
+            self.initialized = True
             
-            if not symbols:
+            if not all_symbols:
                 print("No symbols provided!")
                 return
                 
-            #print(f"RTD Worker About to subscribe to symbols: {symbols}")
             success_count = 0
-            # Subscribe to all symbols
-            for symbol in symbols:
-                try:
-                    if symbol.startswith('.'):
-                        #print(f"Subscribing to GAMMA and OPEN_INT for {symbol}")
-                        if self.client.subscribe(QuoteType.GAMMA, symbol):
-                            success_count += 1
-                        if self.client.subscribe(QuoteType.OPEN_INT, symbol):
-                            success_count += 1
-                    else:
-                        print(f"Subscribing to LAST for {symbol}")
-                        if self.client.subscribe(QuoteType.LAST, symbol):
-                            success_count += 1
-                    #print(f"Successfully subscribed to {symbol}")
-                except Exception as sub_error:
-                    print(f"Error subscribing to {symbol}: {str(sub_error)}")
+            subscription_errors = []
             
+            # Subscribe to all symbols at once with retry
+            for symbol in all_symbols:
+                retry_count = 0
+                while retry_count < 3:  # Try up to 3 times
+                    try:
+                        if symbol.startswith('.'):
+                            if self.client.subscribe(QuoteType.GAMMA, symbol):
+                                success_count += 1
+                            if self.client.subscribe(QuoteType.OPEN_INT, symbol):
+                                success_count += 1
+                        else:
+                            print(f"Subscribing to LAST for {symbol}")
+                            if self.client.subscribe(QuoteType.LAST, symbol):
+                                success_count += 1
+                        break  # Success, exit retry loop
+                    except Exception as sub_error:
+                        retry_count += 1
+                        if retry_count == 3:
+                            error_msg = f"Failed to subscribe to {symbol} after 3 attempts: {str(sub_error)}"
+                            subscription_errors.append(error_msg)
+                            print(error_msg)
+                        time.sleep(0.1)  # Short delay between retries
+            
+            if subscription_errors:
+                self.data_queue.put({"error": "\n".join(subscription_errors)})
+                return
+
             print(f"Successfully subscribed to {success_count} topics")
+            time.sleep(0.3)  # Wait for subscriptions to settle
             
-            # Add delay after subscriptions
-            #print("RTD Worker after subscribing.  Sleeping for .1 seconds...") # maybe less is ok?
-            time.sleep(.1)
-            
-            #print("RTD Worker Starting main message listening loop")
             message_count = 0
-            last_data = {}  # Track last known values
+            last_data = {}
             
             while not self.stop_event.is_set():
-                # Process COM messages
                 pythoncom.PumpWaitingMessages()
                 
                 try:
@@ -91,12 +81,8 @@ class RTDWorker:
                                 key = f"{symbol}:{quote_type}"
                                 current_data[key] = quote.value
                             
-                            # Only update queue if values changed
                             if current_data != last_data:
                                 message_count += 1
-                                #print(f"Message #{message_count} - Data changed, updating queue")
-                                
-                                # Clear queue if it has old data
                                 while not self.data_queue.empty():
                                     try:
                                         self.data_queue.get_nowait()
@@ -109,8 +95,7 @@ class RTDWorker:
                 except Exception as e:
                     print(f"Data processing error: {str(e)}")
                 
-                # Sleep a reasonable amount between checks
-                time.sleep(0.5)  # Check twice per second
+                time.sleep(1)
 
         except Exception as e:
             error_msg = f"RTD Error: {str(e)}"
@@ -125,6 +110,11 @@ class RTDWorker:
             try:
                 print("Disconnecting RTDClient...")
                 self.client.Disconnect()
+                self.client = None
             except Exception as e:
                 print(f"Error during disconnect: {str(e)}")
-        pythoncom.CoUninitialize()
+        try:
+            pythoncom.CoUninitialize()
+        except Exception as e:
+            print(f"Error during CoUninitialize: {str(e)}")
+        self.initialized = False
