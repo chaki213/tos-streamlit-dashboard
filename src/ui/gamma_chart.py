@@ -197,8 +197,29 @@ class GammaChartBuilder:
 
     def _set_layout(self, fig, chart_range, current_price=None):
         price_str = f" Price: ${current_price:.2f}" if current_price else ""
+        
+        # Calculate total GEX from the traces only if traces exist
+        gex_totals = ""
+        if fig.data:  # Check if there are any traces
+            try:
+                total_pos_gex = sum([bar.x for bar in fig.data if bar.name == 'Positive GEX'][0])
+                total_neg_gex = sum([bar.x for bar in fig.data if bar.name == 'Negative GEX'][0])
+                gex_totals = (f'<span style="color: green">+${total_pos_gex:.0f}M</span> | '
+                            f'<span style="color: red">${total_neg_gex:.0f}M</span>')
+            except (IndexError, AttributeError):
+                pass
+        
+        # Add more spacing with &nbsp; HTML entities
         fig.update_layout(
-            title=f'{self.symbol} Gamma Exposure ($ per 1% move)   {price_str}',
+            title={
+                'text': (f'{self.symbol} Gamma Exposure ($ per 1% move)   {price_str}'
+                        f'<span style="float: right">&nbsp;&nbsp;&nbsp;&nbsp;{gex_totals}</span>'),
+                'xanchor': 'left',
+                'x': 0,
+                'xref': 'paper',
+                'yref': 'paper',
+                'font': {'size': 16}
+            },
             xaxis_title='Gamma Exposure ($M)',  # Added M to indicate millions
             yaxis_title='Strike Price',
             barmode='overlay',
