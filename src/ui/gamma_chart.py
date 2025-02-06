@@ -84,7 +84,7 @@ class GammaChartBuilder:
             try:
                 call_symbol = next(sym for sym in option_symbols if f'C{strike}' in sym)
                 put_symbol = next(sym for sym in option_symbols if f'P{strike}' in sym)
-                print(f"Call: {call_symbol}")
+                #print(f"Call: {call_symbol}")
                 
                 # Safely get and convert values, defaulting to 0 if any errors
                 try:
