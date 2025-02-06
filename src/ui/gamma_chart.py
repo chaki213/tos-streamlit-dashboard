@@ -23,8 +23,8 @@ class GammaChartBuilder:
         
         pos_gex_values, neg_gex_values = self._calculate_gex_values(data, strikes, option_symbols)
 
-        pos_values = [round(x/1000000, 0) for x in pos_gex_values]
-        neg_values = [round(x/1000000, 0) for x in neg_gex_values]
+        pos_values = [x for x in pos_gex_values]
+        neg_values = [x for x in neg_gex_values]
 
         # Find max values and their strikes
         max_pos_idx = pos_values.index(max(pos_values)) if any(pos_values) else -1
@@ -84,7 +84,7 @@ class GammaChartBuilder:
             try:
                 call_symbol = next(sym for sym in option_symbols if f'C{strike}' in sym)
                 put_symbol = next(sym for sym in option_symbols if f'P{strike}' in sym)
-                #print(f"Call: {call_symbol}")
+                print(f"Call: {call_symbol}")
                 
                 # Safely get and convert values, defaulting to 0 if any errors
                 try:
@@ -156,7 +156,7 @@ class GammaChartBuilder:
             fig.add_annotation(
                 x=max_pos,
                 y=max_pos_strike,
-                text=f"+${round(max_pos)}M",
+                text=f"+${round(max_pos/1000000)}M",
                 showarrow=True,
                 arrowhead=2,
                 ax=min(40, annotation_offset * 30),
@@ -178,7 +178,7 @@ class GammaChartBuilder:
             fig.add_annotation(
                 x=min_neg,
                 y=max_neg_strike,
-                text=f"-${abs(round(min_neg))}M",
+                text=f"-${abs(round(min_neg/1000000))}M",
                 showarrow=True,
                 arrowhead=2,
                 ax=max(-40, -annotation_offset * 30),
@@ -202,8 +202,8 @@ class GammaChartBuilder:
         gex_totals = ""
         if fig.data:  # Check if there are any traces
             try:
-                total_pos_gex = sum([bar.x for bar in fig.data if bar.name == 'Positive GEX'][0])
-                total_neg_gex = sum([bar.x for bar in fig.data if bar.name == 'Negative GEX'][0])
+                total_pos_gex = sum([bar.x for bar in fig.data if bar.name == 'Positive GEX'][0])/1000000
+                total_neg_gex = sum([bar.x for bar in fig.data if bar.name == 'Negative GEX'][0])/1000000
                 gex_totals = (f'<span style="color: green">+${total_pos_gex:.0f}M</span> | '
                             f'<span style="color: red">${total_neg_gex:.0f}M</span>')
             except (IndexError, AttributeError):

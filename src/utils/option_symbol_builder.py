@@ -54,7 +54,8 @@ class OptionSymbolBuilder:
         
         for strike in strikes:
             # Format strike string: only show decimal for .5 strikes
-            if strike_spacing == 0.5 and abs(strike % 1 - 0.5) < 0.001:  # Handle floating point comparison
+            if (strike_spacing in [0.5, 2.5] and 
+                abs(strike % 1 - 0.5) < 0.001):  # Handle floating point comparison
                 strike_str = f"{strike:.1f}"
             else:
                 strike_str = f"{int(strike)}"
