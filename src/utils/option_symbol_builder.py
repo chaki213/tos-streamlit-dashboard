@@ -20,6 +20,78 @@ class OptionSymbolBuilder:
         return d == third_friday
 
     @staticmethod
+    def _get_next_n_fridays(start_date: date, n: int) -> list:
+        """Get the next n Fridays from a start date"""
+        fridays = []
+        current = start_date
+        while len(fridays) < n:
+            days_ahead = 4 - current.weekday()  # 4 is Friday
+            if days_ahead <= 0:
+                days_ahead += 7
+            next_friday = current + timedelta(days=days_ahead)
+            fridays.append(next_friday)
+            current = next_friday + timedelta(days=1)
+        return fridays
+
+    @staticmethod
+    def build_surface_symbols(base_symbol: str, current_price: float, strike_range: int, strike_spacing: float, num_expirations: int = 4) -> tuple:
+        """
+        Builds option symbols across multiple expirations for volatility surface
+        Returns: Tuple of (option_symbols, strikes, expiration_dates)
+        """
+        # Get next n Fridays
+        fridays = OptionSymbolBuilder._get_next_n_fridays(date.today(), num_expirations)
+        
+        symbols = []
+        # Use same strike range for all expirations
+        rounded_price = OptionSymbolBuilder._round_to_nearest_strike(current_price, strike_spacing)
+        
+        # Generate strike prices
+        num_strikes = int(2 * strike_range / strike_spacing) + 1
+        strikes = np.linspace(
+            rounded_price - strike_range,
+            rounded_price + strike_range,
+            num_strikes
+        )
+        
+        # Format strikes to match build_symbols behavior
+        formatted_strikes = []
+        for strike in strikes:
+            if strike_spacing in [0.5, 2.5] and abs(strike % 1 - 0.5) < 0.001:
+                formatted_strikes.append(float(f"{strike:.1f}"))
+            else:
+                formatted_strikes.append(int(strike))
+        
+        # Format expiration dates
+        expiration_dates = []
+        
+        for expiry in fridays:
+            # Handle index symbol conversion
+            symbol = base_symbol
+            if not OptionSymbolBuilder._is_third_friday(expiry):
+                if base_symbol == "SPX":
+                    symbol = "SPXW"
+                elif base_symbol == "NDX":
+                    symbol = "NDXP"
+                elif base_symbol == "RUT":
+                    symbol = "RUTW"
+            
+            date_str = expiry.strftime("%y%m%d")
+            expiration_dates.append(date_str)
+            
+            for strike in strikes:
+                if strike_spacing in [0.5, 2.5] and abs(strike % 1 - 0.5) < 0.001:
+                    strike_str = f"{strike:.1f}"
+                else:
+                    strike_str = f"{int(strike)}"
+                    
+                call_symbol = f".{symbol}{date_str}C{strike_str}"
+                put_symbol = f".{symbol}{date_str}P{strike_str}"
+                symbols.extend([call_symbol, put_symbol])
+        
+        return symbols, formatted_strikes, expiration_dates
+
+    @staticmethod
     def build_symbols(base_symbol: str, expiry: date, current_price: float, strike_range: int, strike_spacing: float) -> list:
         """
         Builds a list of option symbols for both calls and puts

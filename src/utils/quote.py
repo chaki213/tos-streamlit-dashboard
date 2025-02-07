@@ -31,8 +31,9 @@ class Quote:
         elif self.quote_type in [QuoteType.VOLUME, QuoteType.ASK_SIZE, QuoteType.BID_SIZE, QuoteType.LAST_SIZE, QuoteType.OPEN_INT]:
             return self._to_int(value)
         elif self.quote_type == QuoteType.IMPL_VOL:
-            float_value = self._to_float(value, percentage=True)
-            return round(float_value, 4) if float_value is not None else None
+            # TOS returns IV as decimal (e.g. 0.25 = 25%)
+            float_value = self._to_float(value)
+            return float_value if float_value is not None else None
         return value
 
     @staticmethod

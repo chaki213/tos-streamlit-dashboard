@@ -20,7 +20,6 @@ class RTDWorker:
             if self.initialized:
                 print("Cleaning up previous instance...")
                 self.cleanup()
-                #time.sleep(.2)  # 1 Wait for proper cleanup
                 
             pythoncom.CoInitialize()
             time.sleep(0.1)  # Increased delay for COM initialization
@@ -41,12 +40,22 @@ class RTDWorker:
                 retry_count = 0
                 while retry_count < 3:  # Try up to 3 times
                     try:
-                        if symbol.startswith('.'):
+                        if symbol.startswith('.'):  # Option symbol
+                            # Debug subscription
+                            #print(f"Subscribing to option {symbol}")
+                            
+                            # Subscribe to IMPL_VOL
+                            iv_success = self.client.subscribe(QuoteType.IMPL_VOL, symbol)
+                            #print(f"IMPL_VOL subscription result: {iv_success}")
+                            if iv_success:
+                                success_count += 1
+                            
+                            # Subscribe to other metrics
                             if self.client.subscribe(QuoteType.GAMMA, symbol):
                                 success_count += 1
                             if self.client.subscribe(QuoteType.OPEN_INT, symbol):
                                 success_count += 1
-                        else:
+                        else:  # Stock symbol
                             print(f"Subscribing to LAST for {symbol}")
                             if self.client.subscribe(QuoteType.LAST, symbol):
                                 success_count += 1

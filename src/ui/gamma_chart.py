@@ -14,6 +14,8 @@ class GammaChartBuilder:
     def create_chart(self, data: dict, strikes: list, option_symbols: list) -> go.Figure:
         """Build and return the gamma exposure chart"""
         fig = go.Figure()
+
+        #print("strikes: ", strikes)
         
         # Get current price first
         current_price = float(data.get(f"{self.symbol}:LAST", 0))

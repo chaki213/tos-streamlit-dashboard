@@ -21,23 +21,21 @@ class DashboardLayout:
     @staticmethod
     def setup_page():
         """Setup basic page layout"""
-        st.title("Live GEX Dashboard")
-        # Add any other layout setup that isn't page config
-        
+        st.title("Options Analytics Dashboard")
         st.markdown(DashboardLayout._get_custom_css(), unsafe_allow_html=True)
 
     @staticmethod
     def create_input_section():
+        # Main input row
         col1, col2, col3, col4, col5, button_col = st.columns([2, 2, 2, 2, 2, 1])
 
         with col1:
             symbol = st.text_input("Symbol:", value="SPY").upper()
         with col2:
-            expiry_date = st.date_input(
-                "Expiry Date:",
-                # Default to the nearest Friday
-                value=DashboardLayout._get_nearest_friday(),
-                format="MM/DD/YYYY"
+            view_type = st.selectbox(
+                "View:",
+                options=["Gamma Exposure", "Volatility Surface"],
+                index=0
             )
         with col3:
             strike_range = st.number_input("Strike Range $(±)", value=10, min_value=1, max_value=500)
@@ -56,7 +54,6 @@ class DashboardLayout:
                 help="Chart refresh interval in seconds"
             )
         with button_col:
-            # Add vertical padding and width control in the same div
             st.markdown('<div style="padding-top: 28px; width: 125px;">', unsafe_allow_html=True)
             toggle_button = st.button(
                 "Pause" if st.session_state.initialized else "Start",
@@ -64,7 +61,17 @@ class DashboardLayout:
             )
             st.markdown('</div>', unsafe_allow_html=True)
 
-        return symbol, expiry_date, strike_range, strike_spacing, round(refresh_rate/2), toggle_button
+        # Only show expiry date for Gamma Exposure view
+        if view_type == "Gamma Exposure":
+            expiry_date = st.date_input(
+                "Expiry Date:",
+                value=DashboardLayout._get_nearest_friday(),
+                format="MM/DD/YYYY"
+            )
+        else:
+            expiry_date = None
+
+        return symbol, view_type, expiry_date, strike_range, strike_spacing, round(refresh_rate/2), toggle_button
 
     @staticmethod
     def _get_custom_css():
