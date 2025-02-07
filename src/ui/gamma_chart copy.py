@@ -64,31 +64,18 @@ class GammaChartBuilder:
         padding = max_abs_value * 0.3
         chart_range = max_abs_value + padding
 
-        self._add_traces(fig, pos_values, neg_values, strikes, vertical, chart_type, graph_type)
+        self._add_traces(fig, pos_values, neg_values, strikes, vertical, chart_type)
         
         # Add price line
         if vertical:
-            # Find the index where current price would fit in strikes
-            price_index = 0
-            for i, strike in enumerate(strikes):
-                if float(strike) > current_price:
-                    price_index = i - 0.5
-                    break
-                elif float(strike) == current_price:
-                    price_index = i
-                    break
-                price_index = i + 0.5
-
-            #print(f"Price index: {price_index}")
-            
-            # Add vertical line at the correct position
-            fig.add_vline(
-                x=price_index,
+            print("No vertical line for moment")
+            """ fig.add_vline(
+                x=current_price,
                 line_color="blue",
-                line_width=1,
+                line_width=2,
                 annotation_text=f"${current_price:.2f}",
-                annotation_position="top"
-            )
+                annotation_position="top right"
+            ) """
         else:
             fig.add_hline(
                 y=current_price,
@@ -104,7 +91,7 @@ class GammaChartBuilder:
             vertical, chart_type
         )
 
-        self._set_layout(fig, chart_range, current_price, vertical, values_label, strikes, graph_type)
+        self._set_layout(fig, chart_range, current_price, vertical, values_label, strikes)
         
         return fig
 
@@ -196,7 +183,7 @@ class GammaChartBuilder:
                 put_values.append(0)
         return call_values, put_values
 
-    def _add_traces(self, fig, pos_values, neg_values, strikes, vertical=False, chart_type="GEX", graph_type="Bar"):
+    def _add_traces(self, fig, pos_values, neg_values, strikes, vertical=False, chart_type="GEX"):
         # Determine trace names based on chart type
         if chart_type in ["GEX", "Gamma Exposure"]:
             pos_name = "Positive GEX"
@@ -208,126 +195,36 @@ class GammaChartBuilder:
         # Convert strikes to strings for categorical axis
         strike_labels = [str(strike) for strike in strikes]
         
-        # Scale factor for bubble size based on max absolute value
-        max_abs_value = max(max(abs(val) for val in pos_values), max(abs(val) for val in neg_values))
-        bubble_scale = 50 / max_abs_value if max_abs_value > 0 else 1
-        
-        # Define trace type and additional properties based on graph_type
-        trace_props = {
-            "Bar": {"type": go.Bar, "extra": {}},
-            "Line": {"type": go.Scatter, "extra": {"mode": "lines", "line_shape": "linear"}},
-            "Scatter": {"type": go.Scatter, "extra": {"mode": "markers"}},
-            "Area": {"type": go.Scatter, "extra": {"mode": "lines", "fill": "tonexty", "stackgroup": "one"}},
-            "Step": {"type": go.Scatter, "extra": {"mode": "lines", "line_shape": "hv"}},
-            "Bubble": {"type": go.Scatter, "extra": {
-                "mode": "markers",
-                "marker": {
-                    "sizemode": "area",
-                    "showscale": True,
-                    "colorscale": [[0, "red"], [0.5, "white"], [1.0, "green"]]
-                }
-            }}
-        }
-        
-        trace_config = trace_props.get(graph_type, trace_props["Bar"])
-        TraceType = trace_config["type"]
-        extra_props = trace_config["extra"].copy()  # Make a copy to modify for each trace
-        
         if vertical:
-            common_props = {
-                "x": strike_labels,
-                "showlegend": True,
-            }
+            fig.add_trace(go.Bar(
+                y=pos_values,
+                x=strike_labels,  # Use strike labels
+                name=pos_name,
+                marker_color=self.pos_color
+            ))
             
-            # Special handling for bubble chart
-            if graph_type == "Bubble":
-                # Combine positive and negative values into a single trace
-                all_values = [p if p != 0 else n for p, n in zip(pos_values, neg_values)]
-                sizes = [abs(val) * bubble_scale for val in all_values]
-                colors = all_values  # Use values for colors
-                
-                extra_props["marker"].update({
-                    "size": sizes,
-                    "color": colors,
-                    "sizeref": 2 * max(sizes) / (40**2),  # Normalize bubble sizes
-                })
-                
-                fig.add_trace(TraceType(
-                    y=all_values,
-                    name="GEX",
-                    **common_props,
-                    **extra_props
-                ))
-            else:
-                # Add positive values trace
-                fig.add_trace(TraceType(
-                    y=pos_values,
-                    name=pos_name,
-                    marker_color=self.pos_color,
-                    **common_props,
-                    **extra_props
-                ))
-                
-                # Add negative values trace
-                fig.add_trace(TraceType(
-                    y=neg_values,
-                    name=neg_name,
-                    marker_color=self.neg_color,
-                    **common_props,
-                    **extra_props
-                ))
+            fig.add_trace(go.Bar(
+                y=neg_values,
+                x=strike_labels,  # Use strike labels
+                name=neg_name,
+                marker_color=self.neg_color
+            ))
         else:
-            common_props = {
-                "y": strikes,
-                "showlegend": True,
-            }
+            fig.add_trace(go.Bar(
+                x=pos_values,
+                y=strikes,
+                orientation='h',
+                name=pos_name,
+                marker_color=self.pos_color
+            ))
             
-            # For horizontal orientation
-            orientation_props = {"orientation": "h"} if graph_type == "Bar" else {}
-            
-            # Special handling for bubble chart in horizontal mode
-            if graph_type == "Bubble":
-                # Combine positive and negative values into a single trace
-                all_values = [p if p != 0 else n for p, n in zip(pos_values, neg_values)]
-                sizes = [abs(val) * bubble_scale for val in all_values]
-                colors = all_values  # Use values for colors
-                
-                extra_props["marker"].update({
-                    "size": sizes,
-                    "color": colors,
-                    "sizeref": 2 * max(sizes) / (40**2),  # Normalize bubble sizes
-                })
-                
-                fig.add_trace(TraceType(
-                    x=all_values,
-                    name="GEX",
-                    **common_props,
-                    **extra_props
-                ))
-            else:
-                # Add positive values trace
-                fig.add_trace(TraceType(
-                    x=pos_values,
-                    name=pos_name,
-                    marker_color=self.pos_color,
-                    **common_props,
-                    **orientation_props,
-                    **extra_props
-                ))
-                
-                # Add negative values trace
-                fig.add_trace(TraceType(
-                    x=neg_values,
-                    name=neg_name,
-                    marker_color=self.neg_color,
-                    **common_props,
-                    **orientation_props,
-                    **extra_props
-                ))
-
-        # Special handling for Area charts to ensure proper stacking
-        if graph_type == "Area":
-            fig.update_layout(hovermode="x unified")
+            fig.add_trace(go.Bar(
+                x=neg_values,
+                y=strikes,
+                orientation='h',
+                name=neg_name,
+                marker_color=self.neg_color
+            ))
 
     def _add_annotations(self, fig, max_pos, min_neg, padding, max_pos_idx, max_pos_strike, max_neg_idx, max_neg_strike, vertical=False, chart_type="GEX"):
         annotation_offset = padding * 0.7
@@ -336,15 +233,16 @@ class GammaChartBuilder:
         is_gex = chart_type in ["GEX", "Gamma Exposure"]
         
         if vertical:
-            if max_pos_idx >= 0 and max_pos > 0:
+            print("No vertical min/max for moment")
+            """ if max_pos_idx >= 0 and max_pos > 0:
                 text = f"+${round(max_pos)}M" if is_gex else f"+{round(max_pos):,}"
                 fig.add_annotation(
-                    x=max_pos_idx,  # Use index position for x
-                    y=max_pos + (padding * 0.2),  # Add small padding above bar
+                    y=max_pos,
+                    x=max_pos_strike,
                     text=text,
                     showarrow=True,
                     arrowhead=2,
-                    ay=-20,
+                    ay=-20,  # Fixed offset for cleaner appearance
                     ax=0,
                     align="center",
                     yshift=10
@@ -353,23 +251,23 @@ class GammaChartBuilder:
             if max_neg_idx >= 0 and min_neg < 0:
                 text = f"-${abs(round(min_neg))}M" if is_gex else f"-{abs(round(min_neg)):,}"
                 fig.add_annotation(
-                    x=max_neg_idx,  # Use index position for x
-                    y=min_neg - (padding * 0.2),  # Add small padding below bar
+                    y=min_neg,
+                    x=max_neg_strike,
                     text=text,
                     showarrow=True,
                     arrowhead=2,
-                    ay=20,
+                    ay=20,  # Fixed offset for cleaner appearance
                     ax=0,
                     align="center",
                     yshift=-10
                 )
 
-            # Add volume annotations for vertical mode
+            # Adjust top volume arrows positioning in vertical mode
             if chart_type == "Volume":
                 if max_pos_idx >= 0 and max_pos > 0:
                     fig.add_annotation(
-                        x=max_pos_idx,
-                        y=max_pos + (padding * 0.3),
+                        y=max_pos,
+                        x=max_pos_strike,
                         text="Top Volume",
                         showarrow=True,
                         arrowhead=2,
@@ -379,15 +277,15 @@ class GammaChartBuilder:
                     )
                 if max_neg_idx >= 0 and min_neg < 0:
                     fig.add_annotation(
-                        x=max_neg_idx,
-                        y=min_neg - (padding * 0.3),
+                        y=min_neg,
+                        x=max_neg_strike,
                         text="Top Volume",
                         showarrow=True,
                         arrowhead=2,
                         ay=40,
                         ax=0,
                         align="center"
-                    )
+                    ) """
         else:
             if max_pos_idx >= 0 and max_pos > 0:
                 text = f"+${round(max_pos)}M" if is_gex else f"+{round(max_pos):,}"
@@ -440,7 +338,7 @@ class GammaChartBuilder:
                         align="right"
                     )
 
-    def _set_layout(self, fig, chart_range, current_price=None, vertical=False, values_label="Gamma Exposure ($M)", strikes=None, graph_type="Bar"):
+    def _set_layout(self, fig, chart_range, current_price=None, vertical=False, values_label="Gamma Exposure ($M)", strikes=None):
         price_str = f" Price: ${current_price:.2f}" if current_price else ""
         layout_args = {
             'title': f'{self.symbol} {values_label}   {price_str}',
@@ -467,36 +365,26 @@ class GammaChartBuilder:
                     zeroline=True,
                     zerolinewidth=1,
                     zerolinecolor='black',
+                    gridcolor='red',
+                    showgrid=True,
+                    gridwidth=1,  # Set grid line width
+                    gridstyle='dash'  # Can be 'solid', 'dash', 'dot', 'dashdot'
                 ),
                 'xaxis': dict(
                     tickmode='array',
                     ticktext=strike_labels,
                     tickvals=strike_labels,
                     tickangle=45,
+                    showgrid=True,
+                    gridcolor='blue',
+                    gridwidth=1,  # Set grid line width
+                    gridstyle='dash',  # Can be 'solid', 'dash', 'dot', 'dashdot'
                     type='category',
-                    # Force domain to be full width and constrain price line
-                    domain=[0, 1],
-                    # Ensure bars are spaced properly
-                    rangeslider=dict(visible=False),
-                    automargin=True
-                ),
+                )
             })
             
             # Add bargap for better spacing in vertical mode
-            if graph_type != "Bubble":  # Don't add bargap for bubble charts
-                layout_args['bargap'] = 0.15
-                
-            # Special handling for bubble charts
-            if graph_type == "Bubble":
-                layout_args.update({
-                    'hoverlabel': dict(
-                        bgcolor="white",
-                        font_size=12,
-                        font_family="Arial"
-                    ),
-                    'hovermode': 'closest'
-                })
-                
+            layout_args['bargap'] = 0.15
         else:
             layout_args.update({
                 'xaxis_title': values_label,
@@ -511,17 +399,6 @@ class GammaChartBuilder:
                     autorange='reversed'
                 )
             })
-            
-            # Special handling for bubble charts in horizontal mode
-            if graph_type == "Bubble":
-                layout_args.update({
-                    'hoverlabel': dict(
-                        bgcolor="white",
-                        font_size=12,
-                        font_family="Arial"
-                    ),
-                    'hovermode': 'closest'
-                })
 
         fig.update_layout(**layout_args)
 

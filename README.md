@@ -45,11 +45,7 @@ streamlit run app.py
 ## Notes
 
 - This does work with Ondemand. Can use this on weekends to review historical data.
-- Gamma values are displayed in millions of dollars per 1% move in underlying asset.
-
-## Build
-- This repo is a basic example. We hope you will build upon it and make it your own.
-- If you build something, share it and we can keep a directory of projects.
+- Gamma values are displayed in millions of dollars per 1% move in underlying asset
 
 ## Credit
 Backend:
@@ -58,15 +54,7 @@ Backend:
 
 Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
 
-Gamma Exposure Calculations:  [perfiliev](https://perfiliev.com/blog/how-to-calculate-gamma-exposure-and-zero-gamma-level/)
-
 ## Support
 [@2187Nick](https://x.com/2187Nick)
 
 [Discord](https://discord.com/invite/vxKepZ6XNC)
-
-<br />
-<div align="center">
-  <p>Finding value in my work?</p>
-  <a href="https://www.buymeacoffee.com/2187Nick" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
-</div>

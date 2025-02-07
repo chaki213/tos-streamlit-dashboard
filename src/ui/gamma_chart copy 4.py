@@ -104,7 +104,7 @@ class GammaChartBuilder:
             vertical, chart_type
         )
 
-        self._set_layout(fig, chart_range, current_price, vertical, values_label, strikes, graph_type)
+        self._set_layout(fig, chart_range, current_price, vertical, values_label, strikes)
         
         return fig
 
@@ -208,10 +208,6 @@ class GammaChartBuilder:
         # Convert strikes to strings for categorical axis
         strike_labels = [str(strike) for strike in strikes]
         
-        # Scale factor for bubble size based on max absolute value
-        max_abs_value = max(max(abs(val) for val in pos_values), max(abs(val) for val in neg_values))
-        bubble_scale = 50 / max_abs_value if max_abs_value > 0 else 1
-        
         # Define trace type and additional properties based on graph_type
         trace_props = {
             "Bar": {"type": go.Bar, "extra": {}},
@@ -219,19 +215,12 @@ class GammaChartBuilder:
             "Scatter": {"type": go.Scatter, "extra": {"mode": "markers"}},
             "Area": {"type": go.Scatter, "extra": {"mode": "lines", "fill": "tonexty", "stackgroup": "one"}},
             "Step": {"type": go.Scatter, "extra": {"mode": "lines", "line_shape": "hv"}},
-            "Bubble": {"type": go.Scatter, "extra": {
-                "mode": "markers",
-                "marker": {
-                    "sizemode": "area",
-                    "showscale": True,
-                    "colorscale": [[0, "red"], [0.5, "white"], [1.0, "green"]]
-                }
-            }}
+            "Waterfall": {"type": go.Waterfall, "extra": {"connector": {"line": {"color": "rgb(63, 63, 63)"}}}}
         }
         
         trace_config = trace_props.get(graph_type, trace_props["Bar"])
         TraceType = trace_config["type"]
-        extra_props = trace_config["extra"].copy()  # Make a copy to modify for each trace
+        extra_props = trace_config["extra"]
         
         if vertical:
             common_props = {
@@ -239,43 +228,23 @@ class GammaChartBuilder:
                 "showlegend": True,
             }
             
-            # Special handling for bubble chart
-            if graph_type == "Bubble":
-                # Combine positive and negative values into a single trace
-                all_values = [p if p != 0 else n for p, n in zip(pos_values, neg_values)]
-                sizes = [abs(val) * bubble_scale for val in all_values]
-                colors = all_values  # Use values for colors
-                
-                extra_props["marker"].update({
-                    "size": sizes,
-                    "color": colors,
-                    "sizeref": 2 * max(sizes) / (40**2),  # Normalize bubble sizes
-                })
-                
-                fig.add_trace(TraceType(
-                    y=all_values,
-                    name="GEX",
-                    **common_props,
-                    **extra_props
-                ))
-            else:
-                # Add positive values trace
-                fig.add_trace(TraceType(
-                    y=pos_values,
-                    name=pos_name,
-                    marker_color=self.pos_color,
-                    **common_props,
-                    **extra_props
-                ))
-                
-                # Add negative values trace
-                fig.add_trace(TraceType(
-                    y=neg_values,
-                    name=neg_name,
-                    marker_color=self.neg_color,
-                    **common_props,
-                    **extra_props
-                ))
+            # Add positive values trace
+            fig.add_trace(TraceType(
+                y=pos_values,
+                name=pos_name,
+                marker_color=self.pos_color,
+                **common_props,
+                **extra_props
+            ))
+            
+            # Add negative values trace
+            fig.add_trace(TraceType(
+                y=neg_values,
+                name=neg_name,
+                marker_color=self.neg_color,
+                **common_props,
+                **extra_props
+            ))
         else:
             common_props = {
                 "y": strikes,
@@ -285,45 +254,25 @@ class GammaChartBuilder:
             # For horizontal orientation
             orientation_props = {"orientation": "h"} if graph_type == "Bar" else {}
             
-            # Special handling for bubble chart in horizontal mode
-            if graph_type == "Bubble":
-                # Combine positive and negative values into a single trace
-                all_values = [p if p != 0 else n for p, n in zip(pos_values, neg_values)]
-                sizes = [abs(val) * bubble_scale for val in all_values]
-                colors = all_values  # Use values for colors
-                
-                extra_props["marker"].update({
-                    "size": sizes,
-                    "color": colors,
-                    "sizeref": 2 * max(sizes) / (40**2),  # Normalize bubble sizes
-                })
-                
-                fig.add_trace(TraceType(
-                    x=all_values,
-                    name="GEX",
-                    **common_props,
-                    **extra_props
-                ))
-            else:
-                # Add positive values trace
-                fig.add_trace(TraceType(
-                    x=pos_values,
-                    name=pos_name,
-                    marker_color=self.pos_color,
-                    **common_props,
-                    **orientation_props,
-                    **extra_props
-                ))
-                
-                # Add negative values trace
-                fig.add_trace(TraceType(
-                    x=neg_values,
-                    name=neg_name,
-                    marker_color=self.neg_color,
-                    **common_props,
-                    **orientation_props,
-                    **extra_props
-                ))
+            # Add positive values trace
+            fig.add_trace(TraceType(
+                x=pos_values,
+                name=pos_name,
+                marker_color=self.pos_color,
+                **common_props,
+                **orientation_props,
+                **extra_props
+            ))
+            
+            # Add negative values trace
+            fig.add_trace(TraceType(
+                x=neg_values,
+                name=neg_name,
+                marker_color=self.neg_color,
+                **common_props,
+                **orientation_props,
+                **extra_props
+            ))
 
         # Special handling for Area charts to ensure proper stacking
         if graph_type == "Area":
@@ -440,7 +389,7 @@ class GammaChartBuilder:
                         align="right"
                     )
 
-    def _set_layout(self, fig, chart_range, current_price=None, vertical=False, values_label="Gamma Exposure ($M)", strikes=None, graph_type="Bar"):
+    def _set_layout(self, fig, chart_range, current_price=None, vertical=False, values_label="Gamma Exposure ($M)", strikes=None):
         price_str = f" Price: ${current_price:.2f}" if current_price else ""
         layout_args = {
             'title': f'{self.symbol} {values_label}   {price_str}',
@@ -483,20 +432,7 @@ class GammaChartBuilder:
             })
             
             # Add bargap for better spacing in vertical mode
-            if graph_type != "Bubble":  # Don't add bargap for bubble charts
-                layout_args['bargap'] = 0.15
-                
-            # Special handling for bubble charts
-            if graph_type == "Bubble":
-                layout_args.update({
-                    'hoverlabel': dict(
-                        bgcolor="white",
-                        font_size=12,
-                        font_family="Arial"
-                    ),
-                    'hovermode': 'closest'
-                })
-                
+            layout_args['bargap'] = 0.15
         else:
             layout_args.update({
                 'xaxis_title': values_label,
@@ -511,17 +447,6 @@ class GammaChartBuilder:
                     autorange='reversed'
                 )
             })
-            
-            # Special handling for bubble charts in horizontal mode
-            if graph_type == "Bubble":
-                layout_args.update({
-                    'hoverlabel': dict(
-                        bgcolor="white",
-                        font_size=12,
-                        font_family="Arial"
-                    ),
-                    'hovermode': 'closest'
-                })
 
         fig.update_layout(**layout_args)
 
