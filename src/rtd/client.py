@@ -161,20 +161,8 @@ class RTDClient(COMObject):
     def subscribe(self, quote_type: Union[str, QuoteType], symbol: str) -> Optional[int]:
         """
         Subscribe to a specific quote type for a symbol.
-        
-        Args:
-            quote_type: Type of quote to subscribe to
-            symbol: Trading symbol
-            
-        Returns:
-            int: Topic ID if subscription successful, None otherwise
-            
-        Raises:
-            RTDClientError: If subscription fails
-            RTDConnectionError: If called in invalid state
         """
         with self._topic_lock:
-
             quote_type_str = topic.validate_quote_type(quote_type)
             topic_id = topic.generate_topic_id(quote_type_str, symbol)
             
@@ -191,21 +179,23 @@ class RTDClient(COMObject):
             get_new_values = VARIANT_BOOL(True)
             
             try:
+                self.logger.info(f"Attempting to subscribe to {symbol} {quote_type_str}")  # Added debug log
                 result = self.server.ConnectData(
                     topic_id, strings, get_new_values
                 )
-                self.logger.debug(f"Subscription raw result {result}")
+                self.logger.debug(f"Subscription raw result for {symbol}: {result}")  # Enhanced debug log
                 
                 if isinstance(result, list) and len(result) >= 1 and result[0]:
                     self.topics[topic_id] = (symbol, quote_type_str)
-                    self.logger.debug(
-                        f"Subscribed to {symbol} {quote_type_str} "
+                    self.logger.info(  # Changed to info level for better visibility
+                        f"Successfully subscribed to {symbol} {quote_type_str} "
                         f"with ID {topic_id}"
                     )
                     return topic_id
                 else:
                     self.logger.warning(
-                        f"Subscription failed for {symbol} {quote_type_str}"
+                        f"Subscription failed for {symbol} {quote_type_str} - "
+                        f"Invalid result format: {result}"
                     )
                     return None
                     
@@ -348,17 +338,30 @@ class RTDClient(COMObject):
 
             # Update latest value
             with self._value_lock:
+                # For futures, we need to store both with and without exchange suffix
+                # This ensures we can retrieve the quote using either format
                 key = (symbol, quote_type)
-                old_value = None
-                if key in self._latest_values:
-                    old_value = self._latest_values[key].value
-                self._latest_values[key] = quote
+                if ':' in symbol:  # Has exchange suffix
+                    base_symbol = symbol.split(':')[0]  # Get symbol without exchange
+                    base_key = (base_symbol, quote_type)
+                    # Store under both keys
+                    self._latest_values[key] = quote
+                    self._latest_values[base_key] = quote
+                    old_value = None
+                    if key in self._latest_values:
+                        old_value = self._latest_values[key].value
+                else:
+                    self._latest_values[key] = quote
+                    old_value = None
+                    if key in self._latest_values:
+                        old_value = self._latest_values[key].value
+
                 value_changed = old_value != quote.value
 
             # Commenting this out for now. 
-            """ if value_changed:
+            if value_changed:
                 timestamp = datetime.now().strftime("%H:%M:%S")
-                self.logger.quote(f"[{timestamp}] LIVE {symbol} {quote_type}: {str(quote)}") """
+                self.logger.quote(f"[{timestamp}] LIVE {symbol} {quote_type}: {str(quote)}")
             
         except Exception as e:
             self.logger.error(f"Error handling quote update: {e}")

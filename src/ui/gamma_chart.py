@@ -1,4 +1,5 @@
 import plotly.graph_objects as go
+from src.utils.option_symbol_builder import OptionSymbolBuilder
 
 class GammaChartBuilder:
     def __init__(self, symbol: str):
@@ -21,9 +22,22 @@ class GammaChartBuilder:
         """Build and return the chart"""
         fig = go.Figure()
         
+        if not strikes or not option_symbols:
+            print("No strikes or option symbols available")
+            return self.create_empty_chart()
+        
         # Get current price first
-        current_price = float(data.get(f"{self.symbol}:LAST", 0))
+        if self.symbol.startswith('/'):
+            exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(self.symbol, "XCBT")
+            price_key = f"{self.symbol}:{exchange}:LAST"
+            current_price = float(data.get(price_key, 0))
+            print(f"Futures price lookup key: {price_key}")
+            print(f"Current futures price: {current_price}")
+        else:
+            current_price = float(data.get(f"{self.symbol}:LAST", 0))
+            
         if current_price == 0:
+            print("No price data available")
             return self.create_empty_chart()
 
         # Get appropriate values based on chart type
@@ -33,8 +47,9 @@ class GammaChartBuilder:
         if chart_type in ["GEX", "Gamma Exposure"]:
             pos_values, neg_values = self._calculate_gex_values(data, strikes, option_symbols)
             values_label = "Gamma Exposure ($ per 1% move)"
-            pos_values = [x/1000000 for x in pos_values]
-            neg_values = [x/1000000 for x in neg_values]
+            if pos_values or neg_values:  # Only scale if we have values
+                pos_values = [x/1000000 for x in pos_values]
+                neg_values = [x/1000000 for x in neg_values]
         elif chart_type == "Volume":
             pos_values, neg_values = self._calculate_volume_values(data, strikes, option_symbols)
             values_label = "Volume"
@@ -42,16 +57,20 @@ class GammaChartBuilder:
             pos_values, neg_values = self._calculate_oi_values(data, strikes, option_symbols)
             values_label = "Open Interest"
 
+        if not pos_values and not neg_values:
+            print(f"No {chart_type} data available")
+            return self.create_empty_chart()
+
         # Round the values
         pos_values = [round(x, 0) for x in pos_values]
         neg_values = [round(x, 0) for x in neg_values]
 
-        # Find max values and their strikes
+        # Find max values and their strikes with safety checks
         max_pos_idx = pos_values.index(max(pos_values)) if any(pos_values) else -1
         max_neg_idx = neg_values.index(min(neg_values)) if any(neg_values) else -1
         
-        max_pos_strike = strikes[max_pos_idx] if max_pos_idx >= 0 else None
-        max_neg_strike = strikes[max_neg_idx] if max_neg_idx >= 0 else None
+        max_pos_strike = strikes[max_pos_idx] if max_pos_idx >= 0 and max_pos_idx < len(strikes) else None
+        max_neg_strike = strikes[max_neg_idx] if max_neg_idx >= 0 and max_neg_idx < len(strikes) else None
         
         # Fixed max value calculation with safety checks
         max_pos = max(pos_values) if pos_values else 0
@@ -59,6 +78,7 @@ class GammaChartBuilder:
         max_abs_value = max(abs(min_neg), abs(max_pos))
         
         if max_abs_value == 0:
+            print("No non-zero values to display")
             max_abs_value = 1
             
         padding = max_abs_value * 0.3
@@ -108,47 +128,94 @@ class GammaChartBuilder:
         
         return fig
 
+    def _find_option_symbol(self, option_symbols: list, strike: str, option_type: str) -> str:
+        """
+        Find option symbol for given strike price while handling exchange suffixes
+        
+        Args:
+            option_symbols: List of option symbols
+            strike: Strike price (can be int or float)
+            option_type: 'C' for calls or 'P' for puts
+        
+        Returns:
+            Matching option symbol
+        """
+        strike_str = str(int(float(strike))) if float(strike).is_integer() else str(float(strike))
+        print(f"Looking for {option_type}{strike_str} in options")  # Debug logging
+        
+        try:
+            # First try exact match with exchange suffix
+            matched = [sym for sym in option_symbols if f'{option_type}{strike_str}:' in sym]
+            if matched:
+                print(f"Found symbol with exchange: {matched[0]}")
+                return matched[0]
+            
+            # Try without exchange suffix and with different strike formats
+            matched = [sym for sym in option_symbols if f'{option_type}{strike_str}' in sym and ':' not in sym]
+            if matched:
+                print(f"Found symbol without exchange: {matched[0]}")
+                return matched[0]
+            
+            print(f"Available symbols: {option_symbols[:2]}...")  # Show first few symbols
+            raise ValueError(f"No matching symbol found for {option_type}{strike_str}")
+            
+        except Exception as e:
+            print(f"Error finding symbol for {option_type}{strike_str}: {e}")
+            raise
+
     def _calculate_gex_values(self, data, strikes, option_symbols):
         pos_gex_values = []
         neg_gex_values = []
         
         try:
-            underlying_price = float(data.get(f"{self.symbol}:LAST", 0))
+            # Handle futures price lookup with exchange suffix
+            if self.symbol.startswith('/'):
+                exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(self.symbol, "XCBT")
+                price_key = f"{self.symbol}:{exchange}:LAST"
+                underlying_price = float(data.get(price_key, 0))
+                print(f"GEX calculation - Futures price key: {price_key}")
+                print(f"GEX calculation - Futures price: {underlying_price}")
+            else:
+                underlying_price = float(data.get(f"{self.symbol}:LAST", 0))
+            
         except (ValueError, TypeError):
             underlying_price = 0
             
         if underlying_price == 0:
+            print("Warning: Underlying price is 0")
             return [], []
         
         for strike in strikes:
             try:
-                call_symbol = next(sym for sym in option_symbols if f'C{strike}' in sym)
-                put_symbol = next(sym for sym in option_symbols if f'P{strike}' in sym)
+                call_symbol = self._find_option_symbol(option_symbols, strike, 'C')
+                put_symbol = self._find_option_symbol(option_symbols, strike, 'P')
+                
+                print(f"Processing strike {strike}")
+                print(f"Call symbol: {call_symbol}")
+                print(f"Put symbol: {put_symbol}")
                 
                 try:
                     call_gamma = float(data.get(f"{call_symbol}:GAMMA", 0))
-                except (ValueError, TypeError):
-                    call_gamma = 0
-                    
-                try:
-                    put_gamma = float(data.get(f"{put_symbol}:GAMMA", 0))
-                except (ValueError, TypeError):
-                    put_gamma = 0
-                    
-                try:
                     call_oi = float(data.get(f"{call_symbol}:OPEN_INT", 0))
                 except (ValueError, TypeError):
+                    print(f"Warning: Invalid gamma/oi for {call_symbol}")
+                    call_gamma = 0
                     call_oi = 0
                     
                 try:
+                    put_gamma = float(data.get(f"{put_symbol}:GAMMA", 0))
                     put_oi = float(data.get(f"{put_symbol}:OPEN_INT", 0))
                 except (ValueError, TypeError):
+                    print(f"Warning: Invalid gamma/oi for {put_symbol}")
+                    put_gamma = 0
                     put_oi = 0
                 
                 # gamma exposure per 1% change in the underlying price
                 gex = ((call_oi*call_gamma) - (put_oi*put_gamma)) * 100 * (underlying_price*underlying_price) * .01
+                print(f"GEX for strike {strike}: {gex}")
 
-            except Exception:
+            except Exception as e:
+                print(f"Error processing strike {strike}: {str(e)}")
                 gex = 0
             
             if gex > 0:
@@ -165,15 +232,16 @@ class GammaChartBuilder:
         put_values = []
         for strike in strikes:
             try:
-                call_symbol = next(sym for sym in option_symbols if f'C{strike}' in sym)
-                put_symbol = next(sym for sym in option_symbols if f'P{strike}' in sym)
+                call_symbol = self._find_option_symbol(option_symbols, strike, 'C')
+                put_symbol = self._find_option_symbol(option_symbols, strike, 'P')
                 
                 call_oi = float(data.get(f"{call_symbol}:OPEN_INT", 0))
                 put_oi = float(data.get(f"{put_symbol}:OPEN_INT", 0))
                 
                 call_values.append(call_oi)
                 put_values.append(-put_oi)  # Keep negative
-            except Exception:
+            except Exception as e:
+                print(f"Error processing OI for strike {strike}: {e}")
                 call_values.append(0)
                 put_values.append(0)
         return call_values, put_values
@@ -183,15 +251,16 @@ class GammaChartBuilder:
         put_values = []
         for strike in strikes:
             try:
-                call_symbol = next(sym for sym in option_symbols if f'C{strike}' in sym)
-                put_symbol = next(sym for sym in option_symbols if f'P{strike}' in sym)
+                call_symbol = self._find_option_symbol(option_symbols, strike, 'C')
+                put_symbol = self._find_option_symbol(option_symbols, strike, 'P')
                 
                 call_volume = float(data.get(f"{call_symbol}:VOLUME", 0))
                 put_volume = float(data.get(f"{put_symbol}:VOLUME", 0))
                 
                 call_values.append(call_volume)
                 put_values.append(-put_volume)  # Keep negative
-            except Exception:
+            except Exception as e:
+                print(f"Error processing volume for strike {strike}: {e}")
                 call_values.append(0)
                 put_values.append(0)
         return call_values, put_values
@@ -208,8 +277,12 @@ class GammaChartBuilder:
         # Convert strikes to strings for categorical axis
         strike_labels = [str(strike) for strike in strikes]
         
+        # Safely calculate max values with empty list handling
+        pos_max = max(pos_values) if pos_values else 0
+        neg_max = max(abs(val) for val in neg_values) if neg_values else 0
+        max_abs_value = max(pos_max, neg_max)
+        
         # Scale factor for bubble size based on max absolute value
-        max_abs_value = max(max(abs(val) for val in pos_values), max(abs(val) for val in neg_values))
         bubble_scale = 50 / max_abs_value if max_abs_value > 0 else 1
         
         # Define trace type and additional properties based on graph_type
@@ -330,6 +403,10 @@ class GammaChartBuilder:
             fig.update_layout(hovermode="x unified")
 
     def _add_annotations(self, fig, max_pos, min_neg, padding, max_pos_idx, max_pos_strike, max_neg_idx, max_neg_strike, vertical=False, chart_type="GEX"):
+        if max_pos == 0 and min_neg == 0:
+            # No data to annotate
+            return
+
         annotation_offset = padding * 0.7
         
         # Determine text format based on chart type

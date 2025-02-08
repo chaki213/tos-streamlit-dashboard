@@ -104,16 +104,26 @@ if st.session_state.initialized:
             if "error" in data:
                 st.error(data["error"])
             elif "status" not in data:
-                price_key = f"{symbol}:LAST"
+                # For futures symbols, append exchange suffix for price lookup
+                if symbol.startswith('/'):
+                    exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(symbol, "XCBT")
+                    price_key = f"{symbol}:{exchange}:LAST"
+                    print(f"Initial futures price lookup - Key: {price_key}")  # Debug logging
+                else:
+                    price_key = f"{symbol}:LAST"
+                
                 price = data.get(price_key)
+                print(f"Initial price data received: {price} for {price_key}")  # Debug logging
                 
                 if price:
+                    print(f"Building option chain for {symbol} at price: {price}")  # Debug logging
                     # If we just got the price and don't have option symbols yet,
                     # restart with all symbols
                     if not st.session_state.option_symbols:
                         option_symbols = OptionSymbolBuilder.build_symbols(
                             symbol, expiry_date, price, strike_range, strike_spacing
                         )
+                        print(f"Generated option symbols: {option_symbols[:2]}...")  # Debug first two symbols
                         
                         # Stop current thread
                         st.session_state.stop_event.set()
@@ -123,7 +133,8 @@ if st.session_state.initialized:
                         # Start new thread with all symbols
                         st.session_state.stop_event = threading.Event()
                         st.session_state.option_symbols = option_symbols
-                        all_symbols = [symbol] + option_symbols
+                        all_symbols = [f"{symbol}:{exchange}" if symbol.startswith('/') else symbol] + option_symbols
+                        print(f"Subscribing to base symbol: {all_symbols[0]}")  # Debug logging
                         
                         # Create new RTD worker and thread
                         st.session_state.rtd_worker = RTDWorker(st.session_state.data_queue, st.session_state.stop_event)
@@ -141,33 +152,50 @@ if st.session_state.initialized:
                     strikes = []
                     for sym in st.session_state.option_symbols:
                         if 'C' in sym:
-                            strike_str = sym.split('C')[-1]
-                            if '.5' in strike_str:
-                                strikes.append(float(strike_str))
-                            else:
-                                strikes.append(int(strike_str))
-                    strikes.sort()
+                            try:
+                                # Extract strike from symbol format like './EW1G25C6059:XCME'
+                                parts = sym.split('C')
+                                if len(parts) == 2:
+                                    strike_part = parts[1].split(':')[0]  # Remove exchange suffix
+                                    strike_part = strike_part.strip('"')  # Remove any quotes
+                                    
+                                    # Handle whole numbers and decimals
+                                    strike = float(strike_part)
+                                    strikes.append(int(strike) if strike.is_integer() else strike)
+                            except (ValueError, IndexError) as e:
+                                print(f"Error extracting strike from {sym}: {e}")
+                                continue
                     
-                    # Always update chart if type changed or we don't have a figure
-                    if (st.session_state.last_figure is None or 
-                        'last_chart_type' in st.session_state and st.session_state.last_chart_type != chart_type or
-                        'last_graph_type' not in st.session_state or st.session_state.last_graph_type != graph_type):  # Add graph_type check
-                        force_update = True
+                    if strikes:
+                        strikes.sort()
+                        print(f"Extracted strikes: {strikes[:5]}...")  # Debug log first 5 strikes
+                        
+                        # Always update chart if type changed or we don't have a figure
+                        if (st.session_state.last_figure is None or 
+                            ('last_chart_type' in st.session_state and st.session_state.last_chart_type != chart_type) or
+                            ('last_graph_type' not in st.session_state or st.session_state.last_graph_type != graph_type)):
+                            force_update = True
+                        else:
+                            force_update = False
+
+                        # Convert chart_orientation to vertical boolean
+                        vertical = (chart_orientation == "Vertical")
+
+                        display_type = "Gamma Exposure" if chart_type == "GEX" else chart_type
+
+                        # Check if we have any valid data before creating chart
+                        if data:
+                            fig = st.session_state.chart_builder.create_chart(
+                                data, strikes, st.session_state.option_symbols, 
+                                display_type, graph_type, chart_orientation
+                            )
+                            st.session_state.last_figure = fig
+                            gamma_chart.plotly_chart(fig, use_container_width=True, key=f"update_chart_{chart_type}_{graph_type}")
+                        else:
+                            print("No data available for chart update")
                     else:
+                        print("No valid strikes extracted from symbols")
                         force_update = False
-
-                    # Convert chart_orientation to vertical boolean
-                    vertical = (chart_orientation == "Vertical")
-
-                    # Map chart_type to correct display type
-                    display_type = "Gamma Exposure" if chart_type == "GEX" else chart_type
-                    
-                    fig = st.session_state.chart_builder.create_chart(
-                        data, strikes, st.session_state.option_symbols, 
-                        display_type, graph_type, chart_orientation  # Pass graph_type here
-                    )
-                    st.session_state.last_figure = fig
-                    gamma_chart.plotly_chart(fig, use_container_width=True, key=f"update_chart_{chart_type}_{graph_type}")  # Update key to include graph_type
 
                     if not st.session_state.loading_complete:
                         st.session_state.loading_complete = True

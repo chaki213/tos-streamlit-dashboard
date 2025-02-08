@@ -89,13 +89,12 @@ class PyRTDLogger:
         
         root_logger.handlers.clear()
         
-        # Console handler for QUOTE level only
+        # Console handler for DEBUG level and above
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(QUOTE)  # Show QUOTE and above
-        console_handler.addFilter(lambda record: record.levelno == QUOTE)  # But only QUOTE in console
+        console_handler.setLevel(logging.DEBUG)  # Changed from QUOTE to DEBUG
         
         # Simple formatter for console
-        console_formatter = ColoredQuoteFormatter('%(message)s')
+        console_formatter = ColoredQuoteFormatter('%(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
 
@@ -105,6 +104,7 @@ class PyRTDLogger:
             return self.loggers[name]
             
         logger = logging.getLogger(name)
+        logger.setLevel(logging.DEBUG)  # Set individual logger to DEBUG level
         
         # Only add file handler if not already present
         if not any(isinstance(h, ConcurrentRotatingFileHandler) for h in logger.handlers):
@@ -121,7 +121,7 @@ class PyRTDLogger:
                     '%(asctime)s - %(name)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s'
                 )
                 file_handler.setFormatter(file_formatter)
-                file_handler.setLevel(self.get_log_level(FILE_LOG_LEVEL))
+                file_handler.setLevel(logging.DEBUG)  # Set file handler to DEBUG level
                 logger.addHandler(file_handler)
                 
             except Exception as e:
