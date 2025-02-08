@@ -116,6 +116,8 @@ class OptionSymbolBuilder:
 
     @staticmethod
     def _get_es_product_code(expiry: date) -> str:
+
+        ### still need to address case when date is final day of ES contract
         """
         Get the product code for /ES options based on expiry date
         Format for Mon-Thu: E[week_indicator][weekday_code][month_code][year]
