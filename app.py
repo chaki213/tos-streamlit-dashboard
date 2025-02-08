@@ -123,7 +123,7 @@ if st.session_state.initialized:
                         option_symbols = OptionSymbolBuilder.build_symbols(
                             symbol, expiry_date, price, strike_range, strike_spacing
                         )
-                        print(f"Generated option symbols: {option_symbols[:2]}...")  # Debug first two symbols
+                        #print(f"Generated option symbols: {option_symbols[:2]}...")  # Debug first two symbols
                         
                         # Stop current thread
                         st.session_state.stop_event.set()
@@ -148,23 +148,33 @@ if st.session_state.initialized:
                         time.sleep(0.2)
                 
                 # Update chart
+                # Update chart
                 if st.session_state.option_symbols:
                     strikes = []
                     for sym in st.session_state.option_symbols:
-                        if 'C' in sym:
-                            try:
-                                # Extract strike from symbol format like './EW1G25C6059:XCME'
-                                parts = sym.split('C')
-                                if len(parts) == 2:
-                                    strike_part = parts[1].split(':')[0]  # Remove exchange suffix
-                                    strike_part = strike_part.strip('"')  # Remove any quotes
-                                    
-                                    # Handle whole numbers and decimals
+                        try:
+                            if sym.startswith('./'):  # Futures option symbol
+                                # Example: './E2AG25C6070:XCME' or './E2AG25P6070:XCME'
+                                parts = sym.split(':')[0]  # Remove exchange part first
+                                if 'C' in parts:
+                                    strike_part = parts.split('C')[1]
+                                elif 'P' in parts:
+                                    strike_part = parts.split('P')[1]
+                                else:
+                                    continue
+                                
+                                #print(f"Extracted strike part from futures: {strike_part}")  # Debug log
+                                strike = float(strike_part)
+                                strikes.append(int(strike) if strike.is_integer() else strike)
+                            else:  # Stock option symbol
+                                if 'C' in sym:
+                                    strike_part = sym.split('C')[1]
                                     strike = float(strike_part)
                                     strikes.append(int(strike) if strike.is_integer() else strike)
-                            except (ValueError, IndexError) as e:
-                                print(f"Error extracting strike from {sym}: {e}")
-                                continue
+                                
+                        except (ValueError, IndexError) as e:
+                            print(f"Error extracting strike from {sym}: {e}")
+                            continue
                     
                     if strikes:
                         strikes.sort()

@@ -141,19 +141,19 @@ class GammaChartBuilder:
             Matching option symbol
         """
         strike_str = str(int(float(strike))) if float(strike).is_integer() else str(float(strike))
-        print(f"Looking for {option_type}{strike_str} in options")  # Debug logging
+        #print(f"Looking for {option_type}{strike_str} in options")  # Debug logging
         
         try:
             # First try exact match with exchange suffix
             matched = [sym for sym in option_symbols if f'{option_type}{strike_str}:' in sym]
             if matched:
-                print(f"Found symbol with exchange: {matched[0]}")
+                #print(f"Found symbol with exchange: {matched[0]}")
                 return matched[0]
             
             # Try without exchange suffix and with different strike formats
             matched = [sym for sym in option_symbols if f'{option_type}{strike_str}' in sym and ':' not in sym]
             if matched:
-                print(f"Found symbol without exchange: {matched[0]}")
+                #print(f"Found symbol without exchange: {matched[0]}")
                 return matched[0]
             
             print(f"Available symbols: {option_symbols[:2]}...")  # Show first few symbols
@@ -173,8 +173,8 @@ class GammaChartBuilder:
                 exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(self.symbol, "XCBT")
                 price_key = f"{self.symbol}:{exchange}:LAST"
                 underlying_price = float(data.get(price_key, 0))
-                print(f"GEX calculation - Futures price key: {price_key}")
-                print(f"GEX calculation - Futures price: {underlying_price}")
+                #print(f"GEX calculation - Futures price key: {price_key}")
+                #print(f"GEX calculation - Futures price: {underlying_price}")
             else:
                 underlying_price = float(data.get(f"{self.symbol}:LAST", 0))
             
@@ -190,9 +190,9 @@ class GammaChartBuilder:
                 call_symbol = self._find_option_symbol(option_symbols, strike, 'C')
                 put_symbol = self._find_option_symbol(option_symbols, strike, 'P')
                 
-                print(f"Processing strike {strike}")
-                print(f"Call symbol: {call_symbol}")
-                print(f"Put symbol: {put_symbol}")
+                #print(f"Processing strike {strike}")
+                #print(f"Call symbol: {call_symbol}")
+                #print(f"Put symbol: {put_symbol}")
                 
                 try:
                     call_gamma = float(data.get(f"{call_symbol}:GAMMA", 0))
@@ -212,7 +212,7 @@ class GammaChartBuilder:
                 
                 # gamma exposure per 1% change in the underlying price
                 gex = ((call_oi*call_gamma) - (put_oi*put_gamma)) * 100 * (underlying_price*underlying_price) * .01
-                print(f"GEX for strike {strike}: {gex}")
+                #print(f"GEX for strike {strike}: {gex}")
 
             except Exception as e:
                 print(f"Error processing strike {strike}: {str(e)}")

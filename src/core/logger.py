@@ -91,7 +91,7 @@ class PyRTDLogger:
         
         # Console handler for DEBUG level and above
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)  # Changed from QUOTE to DEBUG
+        console_handler.setLevel(CONSOLE_LOG_LEVEL)  # Changed from QUOTE to DEBUG
         
         # Simple formatter for console
         console_formatter = ColoredQuoteFormatter('%(name)s - %(levelname)s - %(message)s')

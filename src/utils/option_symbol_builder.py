@@ -34,11 +34,16 @@ class OptionSymbolBuilder:
         'Z': '12'   # December
     }
 
-    # Dictionary mapping /ES maturities to their product codes
-    ES_PRODUCT_CODES = {
-        7: "EW1",    # Weekly 1
-        10: "E2A",   # Weekly 2
-        11: "E2B"    # Weekly 3
+    # Dictionary mapping month numbers to futures codes
+    MONTH_TO_CODE = {v: k for k, v in FUTURES_MONTHS.items()}
+
+    # Dictionary mapping weekdays to codes for /ES options
+    WEEKDAY_CODES = {
+        0: "A",  # Monday
+        1: "B",  # Tuesday
+        2: "C",  # Wednesday
+        3: "D",  # Thursday
+        4: "W"   # Friday
     }
 
     @staticmethod
@@ -58,6 +63,44 @@ class OptionSymbolBuilder:
         return d == third_friday
 
     @staticmethod
+    def _is_third_week(d: date) -> bool:
+        """Check if date is in the third week of its month"""
+        return 15 <= d.day <= 21
+
+    @staticmethod
+    def _get_weekday_code(d: date) -> str:
+        """Get the weekday code for /ES options"""
+        return OptionSymbolBuilder.WEEKDAY_CODES.get(d.weekday(), "W")
+
+    @staticmethod
+    def _get_week_indicator(d: date) -> str:
+        """
+        Get the week indicator number (1-5) based on business week of the month
+        First business week starts with the first trading day of the month
+        """
+        first_day = date(d.year, d.month, 1)
+        target_day = d
+        
+        # Calculate the business week number
+        if first_day.weekday() > 4:  # If first day is weekend
+            # Adjust first_day to next Monday
+            days_to_monday = (7 - first_day.weekday())
+            first_day = first_day + timedelta(days=days_to_monday)
+        
+        days_difference = (target_day - first_day).days
+        # Adjust for weekends
+        weeks = (days_difference + first_day.weekday()) // 7 + 1
+        
+        # Handle edge case where the date is before first business day
+        if target_day < first_day:
+            return '1'
+        
+        #print(f"week: {str(min(max(weeks, 1), 5))}")
+        
+        # Ensure week number is between 1 and 5
+        return str(min(max(weeks, 1), 5))
+
+    @staticmethod
     def _get_futures_month_code(expiry: date) -> str:
         """Convert a date to a futures month code"""
         for code, month in OptionSymbolBuilder.FUTURES_MONTHS.items():
@@ -66,19 +109,55 @@ class OptionSymbolBuilder:
         return ''
 
     @staticmethod
-    def _get_es_product_code(expiry: date) -> str:
-        """Get the product code for /ES contracts based on expiry day"""
-        if expiry.day in OptionSymbolBuilder.ES_PRODUCT_CODES:
-            return OptionSymbolBuilder.ES_PRODUCT_CODES[expiry.day]
-        return "ES"  # Default to regular ES
+    def _is_end_of_month(d: date) -> bool:
+        """Check if date is the last trading day of the month"""
+        next_day = d + timedelta(days=1)
+        return next_day.month != d.month
 
     @staticmethod
+    def _get_es_product_code(expiry: date) -> str:
+        """
+        Get the product code for /ES options based on expiry date
+        Format for Mon-Thu: E[week_indicator][weekday_code][month_code][year]
+        Format for Friday: E[weekday_code][week_indicator][month_code][year]
+        Format for EOM: E[weekday_code][month_code][year]
+        Example: ECH25 for a third-week Monday March 2025 contract
+        Example: EW3G25 for a third-week Friday February 2025 contract
+        Example: EWG25 for an end-of-month Friday February 2025 contract
+        """
+        weekday_code = OptionSymbolBuilder._get_weekday_code(expiry)
+        month_code = OptionSymbolBuilder.MONTH_TO_CODE.get(f"{expiry.month:02d}")
+        year = str(expiry.year)[-2:]
+        
+        # Check if it's end of month first
+        if OptionSymbolBuilder._is_end_of_month(expiry):
+            return f"E{weekday_code}{month_code}{year}"
+        
+        # Get week indicator for non-EOM dates
+        week_indicator = OptionSymbolBuilder._get_week_indicator(expiry)
+        
+        # Debug logging
+        print(f"Building /ES code for {expiry}:")
+        print(f"Week indicator: {week_indicator}")
+        print(f"Weekday code: {weekday_code}")
+        print(f"Month code: {month_code}")
+        print(f"Year: {year}")
+        
+        # Special handling for Friday (non-EOM)
+        if expiry.weekday() == 4:  # Friday
+            return f"E{weekday_code}{week_indicator}{month_code}{year}"
+        else:
+            return f"E{week_indicator}{weekday_code}{month_code}{year}"
+        
+    @staticmethod
     def _format_strike(strike: float, is_futures: bool = False) -> str:
-        """Format strike price string, ensuring no decimals if it's a whole number"""
-        if abs(round(strike) - strike) < 0.0001:  # More precise check for whole numbers
-            return str(int(round(strike)))
-        # Only keep decimal if it's not a whole number
-        return str(int(round(strike * 10) / 10))
+        """Format strike price string for options"""
+        strike_int = int(round(strike))
+        if is_futures:
+            # For futures options, pad to 4 digits
+            return f"{strike_int:04d}"
+        # For other options, only keep decimal if it's not a whole number
+        return str(strike_int)
 
     @staticmethod
     def build_symbols(base_symbol: str, expiry: date, current_price: float, strike_range: int, strike_spacing: float) -> list:
@@ -97,40 +176,12 @@ class OptionSymbolBuilder:
             print("Invalid strike spacing")
             return []
             
-        # Check if this is a futures symbol
-        is_futures = base_symbol.startswith('/')
-        
-        if is_futures:
-            # Get exchange suffix
-            exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(base_symbol, "XCBT")
-            # Get futures month code
-            month_code = OptionSymbolBuilder._get_futures_month_code(expiry)
+        # Get exchange suffix for futures
+        exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(base_symbol, "XCBT")
             
-            # Special handling for /ES weekly contracts
-            if base_symbol == "/ES":
-                product_code = OptionSymbolBuilder._get_es_product_code(expiry)
-                futures_base = f"{product_code}{month_code}{str(expiry.year)[-2:]}"
-                print(f"ES Weekly base: {futures_base}")  # Debug log
-            else:
-                futures_base = f"{base_symbol}1{month_code}{str(expiry.year)[-2:]}"
-                print(f"Regular futures base: {futures_base}")  # Debug log
-                
-            # For any futures contract, strip the forward slash for the option symbol
-            if futures_base.startswith('/'):
-                futures_base = futures_base[1:]
-        else:
-            # Handle regular equity/index symbols
-            if not OptionSymbolBuilder._is_third_friday(expiry):
-                if base_symbol == "SPX":
-                    base_symbol = "SPXW"
-                elif base_symbol == "NDX":
-                    base_symbol = "NDXP"
-                elif base_symbol == "RUT":
-                    base_symbol = "RUTW"
-  
         # Round current price to nearest valid strike
         rounded_price = OptionSymbolBuilder._round_to_nearest_strike(current_price, strike_spacing)
-        print(f"Rounded price: {rounded_price}, Range: ±{strike_range}, Spacing: {strike_spacing}")  # Debug log
+        print(f"Rounded price: {rounded_price}, Range: ±{strike_range}, Spacing: {strike_spacing}")
         
         # Generate strike prices using numpy arange
         num_strikes = int(2 * strike_range / strike_spacing) + 1
@@ -144,17 +195,39 @@ class OptionSymbolBuilder:
             print("No strikes generated")
             return []
             
-        print(f"Generated {len(strikes)} strikes from {strikes[0]} to {strikes[-1]}")  # Debug log
+        print(f"Generated {len(strikes)} strikes from {strikes[0]} to {strikes[-1]}")
         
         symbols = []
         
-        if is_futures:
+        # Special handling for /ES futures options
+        if base_symbol == "/ES":
+            product_code = OptionSymbolBuilder._get_es_product_code(expiry)
+            for strike in strikes:
+                strike_str = OptionSymbolBuilder._format_strike(strike, is_futures=True)
+                call_symbol = f"./{product_code}C{strike_str}:{exchange}"
+                put_symbol = f"./{product_code}P{strike_str}:{exchange}"
+                symbols.extend([call_symbol, put_symbol])
+                
+        # Handle other futures options
+        elif base_symbol.startswith('/'):
+            month_code = OptionSymbolBuilder._get_futures_month_code(expiry)
+            futures_base = f"{base_symbol[1:]}1{month_code}{str(expiry.year)[-2:]}"
             for strike in strikes:
                 strike_str = OptionSymbolBuilder._format_strike(strike, is_futures=True)
                 call_symbol = f"./{futures_base}C{strike_str}:{exchange}"
                 put_symbol = f"./{futures_base}P{strike_str}:{exchange}"
                 symbols.extend([call_symbol, put_symbol])
+                
+        # Handle equity/index options
         else:
+            if not OptionSymbolBuilder._is_third_friday(expiry):
+                if base_symbol == "SPX":
+                    base_symbol = "SPXW"
+                elif base_symbol == "NDX":
+                    base_symbol = "NDXP"
+                elif base_symbol == "RUT":
+                    base_symbol = "RUTW"
+            
             date_str = expiry.strftime("%y%m%d")
             for strike in strikes:
                 strike_str = OptionSymbolBuilder._format_strike(strike)
@@ -166,5 +239,5 @@ class OptionSymbolBuilder:
             print("No symbols generated")
             return []
             
-        print(f"Generated {len(symbols)} total symbols. First few: {symbols[:4]}")  # Debug log
+        print(f"Generated {len(symbols)} total symbols. First few: {symbols[:4]}")
         return symbols

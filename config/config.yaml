@@ -14,7 +14,7 @@ rtd:
 
 # Logging Configuration
 logging:
-  console_level: QUOTE
+  console_level: ERROR
   file_level: INFO
   max_bytes: 10000000
   backup_count: 5
