@@ -1,15 +1,15 @@
-# TOS Streamlit Dashboard
+# TOS Streamlit Dashboard Volatility Surface Version
 
 A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 
 ## Demo
-https://github.com/user-attachments/assets/1d6446e0-5c49-4208-872f-f63a55da36a5
+https://github.com/user-attachments/assets/7aaeefd6-a748-4b2f-a575-f1f818885ab2
 
 
 ## Prerequisites
 
 - Windows OS (required for ThinkorSwim RTD)
-- Python 3.8+
+- Python 3.11+
 - ThinkorSwim desktop application installed and running
 
 ## Installation
