@@ -141,7 +141,7 @@ class GammaChartBuilder:
             Matching option symbol
         """
         strike_str = str(int(float(strike))) if float(strike).is_integer() else str(float(strike))
-        #print(f"Looking for {option_type}{strike_str} in options")  # Debug logging
+        print(f"Looking for {option_type}{strike_str} in options")  # Debug logging
         
         try:
             # First try exact match with exchange suffix

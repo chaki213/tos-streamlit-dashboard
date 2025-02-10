@@ -75,7 +75,7 @@ class DashboardLayout:
         with col4:
             strike_spacing = st.selectbox(
                 "Strike Spacing",
-                options=[0.5, 1.0, 2.5, 5.0, 10.0, 25.0],
+                options=[0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 100.0],
                 index=1  # Default to 1.0
             )
         with col5:

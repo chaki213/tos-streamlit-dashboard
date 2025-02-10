@@ -107,6 +107,7 @@ if st.session_state.initialized:
                 # For futures symbols, append exchange suffix for price lookup
                 if symbol.startswith('/'):
                     exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(symbol, "XCBT")
+                    print(f"Extracted exchange for futures: {exchange}")  # Debug logging
                     price_key = f"{symbol}:{exchange}:LAST"
                     print(f"Initial futures price lookup - Key: {price_key}")  # Debug logging
                 else:
@@ -158,12 +159,10 @@ if st.session_state.initialized:
                                 parts = sym.split(':')[0]  # Remove exchange part first
                                 if 'C' in parts:
                                     strike_part = parts.split('C')[1]
-                                elif 'P' in parts:
-                                    strike_part = parts.split('P')[1]
                                 else:
                                     continue
                                 
-                                #print(f"Extracted strike part from futures: {strike_part}")  # Debug log
+                                print(f"Extracted strike part from futures: {strike_part}")  # Debug log
                                 strike = float(strike_part)
                                 strikes.append(int(strike) if strike.is_integer() else strike)
                             else:  # Stock option symbol
