@@ -1,6 +1,7 @@
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
+from scipy import interpolate
 
 class VolatilitySurfaceBuilder:
     def __init__(self, symbol: str):
@@ -28,8 +29,8 @@ class VolatilitySurfaceBuilder:
         expiry_datetimes = [datetime.strptime(exp, '%y%m%d') for exp in expirations]
         expiry_indices = np.arange(len(expiry_datetimes))
         X, Y = np.meshgrid(strike_grid, expiry_indices)
-        Z_calls = np.zeros_like(X, dtype=np.float64)
-        Z_puts = np.zeros_like(X, dtype=np.float64)
+        Z_calls = np.full_like(X, np.nan, dtype=np.float64)  # Initialize with NaN instead of zeros
+        Z_puts = np.full_like(X, np.nan, dtype=np.float64)   # Initialize with NaN instead of zeros
 
         # Calculate date labels and create a text_data array (as plain Python lists)
         date_labels = [dt.strftime('%m-%d-%y') for dt in expiry_datetimes]
@@ -40,18 +41,41 @@ class VolatilitySurfaceBuilder:
         customdata = text_data
 
         
-        # Fill volatility values for both calls and puts
+        # Fill volatility values and interpolate missing data
         for i, expiry in enumerate(expirations):
             for j, strike in enumerate(strikes):
                 # Look up both call and put symbols
                 call_sym = next((s for s in option_symbols if f'{expiry}C{strike}' in s), None)
                 put_sym = next((s for s in option_symbols if f'{expiry}P{strike}' in s), None)
                 
-                # Get implied vol values
-                Z_calls[i,j] = float(data.get(f"{call_sym}:IMPL_VOL", 0) or 0)
-                Z_puts[i,j] = float(data.get(f"{put_sym}:IMPL_VOL", 0) or 0)
+                # Get implied vol values, use NaN for missing or zero values
+                call_vol = float(data.get(f"{call_sym}:IMPL_VOL", 0) or 0)
+                put_vol = float(data.get(f"{put_sym}:IMPL_VOL", 0) or 0)
+                
+                Z_calls[i,j] = call_vol if call_vol > 0 else np.nan
+                Z_puts[i,j] = put_vol if put_vol > 0 else np.nan
 
-        # Remove hovertemplate from surface_properties.
+        # Interpolate missing values for each expiry
+        for i in range(Z_calls.shape[0]):
+            # Handle calls
+            mask = ~np.isnan(Z_calls[i])
+            if np.any(mask):
+                x = strike_grid[mask]
+                y = Z_calls[i][mask]
+                if len(x) > 3:  # Need at least 4 points for cubic interpolation
+                    f = interpolate.interp1d(x, y, kind='cubic', fill_value='extrapolate')
+                    Z_calls[i] = f(strike_grid)
+            
+            # Handle puts
+            mask = ~np.isnan(Z_puts[i])
+            if np.any(mask):
+                x = strike_grid[mask]
+                y = Z_puts[i][mask]
+                if len(x) > 3:
+                    f = interpolate.interp1d(x, y, kind='cubic', fill_value='extrapolate')
+                    Z_puts[i] = f(strike_grid)
+
+        # Updated surface properties for smoother interpolation
         surface_properties = dict(
             colorscale=[
                 [0, 'rgb(0,0,130)'],
@@ -69,17 +93,24 @@ class VolatilitySurfaceBuilder:
                 title_font=dict(color='white')
             ),
             lighting=dict(
-                ambient=0.6,
-                diffuse=0.8,
-                fresnel=0.2,
-                roughness=0.5,
-                specular=0.5
+                ambient=0.85,    # Increased ambient light further
+                diffuse=0.95,    # Increased diffuse light further
+                fresnel=0.1,     # Reduced fresnel for smoother look
+                roughness=0.2,   # Further reduced roughness
+                specular=0.3     # Reduced specular
             ),
             contours=dict(
                 x=dict(show=True, color='rgb(150,150,150)', width=1),
                 y=dict(show=True, color='rgb(150,150,150)', width=1),
-                z=dict(show=True, color='rgb(150,150,150)', width=1)
-            )
+                z=dict(show=True, color='rgb(150,150,150)', width=1) 
+            ),
+            connectgaps=True,     # Connect gaps between missing values
+            surfacecolor=None,    # Let plotly handle the coloring
+            showscale=True,
+            opacity=0.92,         # Slightly increased opacity
+            #cmid=30,             # Center the colorscale around typical IV values
+            #cmin=10,             # Set minimum for color scale
+            #cmax=100,            # Set maximum for color scale
         )
 
         # Add call surface using the text attribute for expiration dates.
@@ -91,7 +122,8 @@ class VolatilitySurfaceBuilder:
             customdata=customdata,
             hovertemplate=(
                 "Strike: $%{x:.2f}<br>" +
-                "IV: %{z}%<br>" +
+                "IV: %{z:.2f}%<br>" +
+                "Expiry: %{text}<br>" +
                 "<extra></extra>"
             ),
             name='Calls',
@@ -108,7 +140,8 @@ class VolatilitySurfaceBuilder:
             customdata=customdata,
             hovertemplate=(
                 "Strike: $%{x:.2f}<br>" +
-                "IV: %{z}%<br>" +
+                "IV: %{z:.2f}%<br>" +
+                "Expiry: %{text}<br>" +
                 "<extra></extra>"
             ),
             name='Puts',

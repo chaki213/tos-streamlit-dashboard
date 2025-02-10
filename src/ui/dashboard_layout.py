@@ -1,6 +1,8 @@
 import streamlit as st
 from datetime import date, timedelta
 
+st.set_page_config(layout="wide")
+
 class DashboardLayout:
     @staticmethod
     def _get_nearest_friday(from_date=None):
