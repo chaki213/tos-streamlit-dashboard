@@ -93,11 +93,16 @@ class VolatilitySurfaceBuilder:
                 title_font=dict(color='white')
             ),
             lighting=dict(
-                ambient=0.85,    # Increased ambient light further
-                diffuse=0.95,    # Increased diffuse light further
-                fresnel=0.1,     # Reduced fresnel for smoother look
-                roughness=0.2,   # Further reduced roughness
-                specular=0.3     # Reduced specular
+                #ambient=0.85,    # Increased ambient light further
+                #diffuse=0.95,    # Increased diffuse light further
+                #fresnel=0.1,     # Reduced fresnel for smoother look
+                #roughness=0.2,   # Further reduced roughness
+                #specular=0.3     # Reduced specular """
+                ambient=0.6,
+                diffuse=0.8,
+                fresnel=0.2,
+                roughness=0.5,
+                specular=0.5
             ),
             contours=dict(
                 x=dict(show=True, color='rgb(150,150,150)', width=1),
@@ -108,9 +113,6 @@ class VolatilitySurfaceBuilder:
             surfacecolor=None,    # Let plotly handle the coloring
             showscale=True,
             opacity=0.92,         # Slightly increased opacity
-            #cmid=30,             # Center the colorscale around typical IV values
-            #cmin=10,             # Set minimum for color scale
-            #cmax=100,            # Set maximum for color scale
         )
 
         # Add call surface using the text attribute for expiration dates.
@@ -123,7 +125,6 @@ class VolatilitySurfaceBuilder:
             hovertemplate=(
                 "Strike: $%{x:.2f}<br>" +
                 "IV: %{z:.2f}%<br>" +
-                "Expiry: %{text}<br>" +
                 "<extra></extra>"
             ),
             name='Calls',
@@ -141,7 +142,6 @@ class VolatilitySurfaceBuilder:
             hovertemplate=(
                 "Strike: $%{x:.2f}<br>" +
                 "IV: %{z:.2f}%<br>" +
-                "Expiry: %{text}<br>" +
                 "<extra></extra>"
             ),
             name='Puts',
