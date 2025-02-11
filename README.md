@@ -1,4 +1,4 @@
-# TOS Streamlit Dashboard
+# TOS Streamlit Dashboard Futures Version
 
 A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 
@@ -9,7 +9,7 @@ https://github.com/user-attachments/assets/1d6446e0-5c49-4208-872f-f63a55da36a5
 ## Prerequisites
 
 - Windows OS (required for ThinkorSwim RTD)
-- Python 3.8+
+- Python 3.11+
 - ThinkorSwim desktop application installed and running
 
 ## Installation
