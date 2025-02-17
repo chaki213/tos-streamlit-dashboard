@@ -175,17 +175,22 @@ class DeltaChartBuilder:
     def _set_layout(self, fig, chart_range, current_price=None, total_pos=0, total_neg=0, net_exposure=0):
         price_str = f" Price: ${current_price:.2f}" if current_price else ""
         
-        # Calculate total DEX from the traces - match gamma chart format exactly
+        # Calculate total DEX from the traces only if traces exist
         dex_totals = ""
-        if fig.data and current_price:  # Check if there are any traces
-            # Format exactly like gamma chart
-            dex_totals = f'<span style="float: right">&nbsp;&nbsp;&nbsp;&nbsp;'
-            dex_totals += f'<span style="color: green">+${total_pos:.0f}M</span> | '
-            dex_totals += f'<span style="color: red">${total_neg:.0f}M</span></span>'
+        if fig.data:  # Check if there are any traces
+            try:
+                total_pos_dex = sum([bar.x for bar in fig.data if bar.name == 'Positive DEX'][0])
+                total_neg_dex = sum([bar.x for bar in fig.data if bar.name == 'Negative DEX'][0])
+                dex_totals = (f'<span style="color: green">+${total_pos_dex:.0f}M</span> | '
+                            f'<span style="color: red">${total_neg_dex:.0f}M</span>')
+            except (IndexError, AttributeError):
+                pass
         
+        # Add more spacing with &nbsp; HTML entities
         fig.update_layout(
             title={
-                'text': f'{self.symbol} Delta Exposure ($ per 1% move){price_str}{dex_totals}',
+                'text': (f'{self.symbol} Delta Exposure ($ per 1% move)   {price_str}'
+                        f'<span style="float: right">&nbsp;&nbsp;&nbsp;&nbsp;{dex_totals}</span>'),
                 'xanchor': 'left',
                 'x': 0,
                 'xref': 'paper',
