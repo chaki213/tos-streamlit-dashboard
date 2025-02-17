@@ -109,7 +109,7 @@ if start_stop_button:
         # Stop tracking but keep the charts
         st.session_state.stop_event.set()
         if st.session_state.active_thread:
-            st.session_state.active_thread.join(timeout=2.0)  # Increased timeout
+            st.session_state.active_thread.join(timeout=1.0)  # Increased timeout
         st.session_state.active_thread = None
         st.session_state.initialized = False
         st.session_state.loading_complete = False
