@@ -46,6 +46,8 @@ class RTDWorker:
                                 success_count += 1
                             if self.client.subscribe(QuoteType.OPEN_INT, symbol):
                                 success_count += 1
+                            if self.client.subscribe(QuoteType.DELTA, symbol):
+                                success_count += 1
                         else:
                             print(f"Subscribing to LAST for {symbol}")
                             if self.client.subscribe(QuoteType.LAST, symbol):

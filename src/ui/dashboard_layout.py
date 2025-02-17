@@ -21,7 +21,7 @@ class DashboardLayout:
     @staticmethod
     def setup_page():
         """Setup basic page layout"""
-        st.title("Live GEX Dashboard")
+        st.title("Live Options Data Dashboard")
         # Add any other layout setup that isn't page config
         
         st.markdown(DashboardLayout._get_custom_css(), unsafe_allow_html=True)
@@ -57,7 +57,7 @@ class DashboardLayout:
             )
         with button_col:
             # Add vertical padding and width control in the same div
-            st.markdown('<div style="padding-top: 28px; width: 125px;">', unsafe_allow_html=True)
+            st.markdown('<div style="width: 1000px;">', unsafe_allow_html=True)
             toggle_button = st.button(
                 "Pause" if st.session_state.initialized else "Start",
                 icon= "⏸️" if st.session_state.initialized else "🔥",
@@ -76,6 +76,7 @@ class DashboardLayout:
             }
             div.stButton > button {
                 width: 125px;  /* or use 100% for full width */
+                vertical-align: top;
+                margin-top: -20px;
             }
-        </style>
-        """
+        </style>"""
