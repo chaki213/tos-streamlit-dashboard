@@ -8,7 +8,7 @@ class DeltaChartBuilder:
     def create_empty_chart(self) -> go.Figure:
         """Create initial empty chart"""
         fig = go.Figure()
-        self._set_layout(fig, 1, None)  # Use 1 as default range, no price
+        self._set_layout(fig, 0.1)
         return fig
 
     def create_chart(self, data: dict, strikes: list, option_symbols: list) -> go.Figure:
@@ -22,29 +22,30 @@ class DeltaChartBuilder:
         
         pos_dex_values, neg_dex_values = self._calculate_dex_values(data, strikes, option_symbols, current_price)
 
-        pos_values = [round(x/1000000, 0) for x in pos_dex_values]
-        neg_values = [round(x/1000000, 0) for x in neg_dex_values]
-
-        # Calculate totals for title
+        max_pos = max(pos_dex_values) if pos_dex_values else 0
+        min_neg = min(neg_dex_values) if neg_dex_values else 0
+        max_abs_value = max(abs(min_neg), abs(max_pos))
+        
+        # Scale to millions after finding max
+        pos_values = [round(x/1000000, 2) for x in pos_dex_values]
+        neg_values = [round(x/1000000, 2) for x in neg_dex_values]
+        
+        # Calculate totals after scaling
         total_pos = sum(pos_values)
         total_neg = sum(neg_values)
         net_exposure = total_pos + total_neg
 
-        # Find max values and their strikes
+        # Find indices after scaling
         max_pos_idx = pos_values.index(max(pos_values)) if any(pos_values) else -1
         max_neg_idx = neg_values.index(min(neg_values)) if any(neg_values) else -1
         
         max_pos_strike = strikes[max_pos_idx] if max_pos_idx >= 0 else None
         max_neg_strike = strikes[max_neg_idx] if max_neg_idx >= 0 else None
         
-        # Fixed max value calculation with safety checks
-        max_pos = max(pos_values) if pos_values else 0
-        min_neg = min(neg_values) if neg_values else 0
-        max_abs_value = max(abs(min_neg), abs(max_pos))
-        
-        # Ensure we have a non-zero range
-        if max_abs_value == 0:
-            max_abs_value = 1
+        # Adjust chart range calculation
+        max_abs_value = max(abs(min(neg_values)), abs(max(pos_values)))
+        if max_abs_value < 0.1:  # If very small values
+            max_abs_value = 0.1
             
         # Add padding to the range (30% on each side)
         padding = max_abs_value * 0.3
