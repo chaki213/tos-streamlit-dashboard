@@ -1,9 +1,9 @@
-# TOS Streamlit Dashboard Futures Version
+# TOS Streamlit Dashboard w Charm Exposure
 
 A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 
-## Demo
-https://github.com/user-attachments/assets/1d6446e0-5c49-4208-872f-f63a55da36a5
+## Charm
+![Charm Demo](charm.png)
 
 
 ## Prerequisites
@@ -58,3 +58,28 @@ Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
 [@2187Nick](https://x.com/2187Nick)
 
 [Discord](https://discord.com/invite/vxKepZ6XNC)
+
+## Naive Dealer Charm Exposure. (Need to confirm this is correct):
+Formula: (call OI + put OI) × charm × 100 × underlying_price
+
+For calls (dealer long):
+
+OTM calls: Positive charm → dealer buys stock
+ITM calls: Negative charm → dealer buys stock
+
+
+For puts (dealer short):
+
+OTM puts: Positive charm → dealer buys stock
+ITM puts: Negative charm → dealer buys stock
+
+The dealer's position (long calls, short puts) combined with the charm effect means
+all components work in the same direction, so we ADD the open interest.
+
+This formula will give us the dollar value of stock the dealer needs to buy (positive)
+or sell (negative) due to the passage of one day.
+
+## Issues to address:
+- [ ] IV retrieves "NAN" the further out of the money we go. Calculate IV in that scenario?
+- [ ] Days to expiration is correct? What time do options officially expire?
+- [ ] Add Charm Exposure per hour?

@@ -153,7 +153,8 @@ class GammaChartBuilder:
             Matching option symbol
         """
         strike_str = str(int(float(strike))) if float(strike).is_integer() else str(float(strike))
-        print(f"Looking for {option_type}{strike_str} in options")  # Debug logging
+        #print(f"Looking for {option_type}{strike_str} in options")  # Debug logging
+        #print(f"option_symbols: {option_symbols}")  # Debug logging
         
         try:
             # First try exact match with exchange suffix
@@ -293,6 +294,7 @@ class GammaChartBuilder:
             else:
                 underlying_price = float(data.get(f"{self.symbol}:LAST", 0))
                 div_yield = float(data.get(f"{self.symbol}:YIELD", 0))  # Already in decimal format 0.0128
+                
             
         except (ValueError, TypeError):
             underlying_price = 0
@@ -321,12 +323,12 @@ class GammaChartBuilder:
         
         # Calculate days to expiration
         time_to_exp = (expiry_datetime - current_time)
-        print(f"Time to expiration: {time_to_exp}")
+        #print(f"Time to expiration: {time_to_exp}")
         days_to_exp = time_to_exp.total_seconds() / 86400  # Convert total seconds to days
         
-        print(f"Current time (EST): {current_time}")
-        print(f"Expiry time (EST): {expiry_datetime}")
-        print(f"Days to expiration: {days_to_exp}")
+        #print(f"Current time (EST): {current_time}")
+        #print(f"Expiry time (EST): {expiry_datetime}")
+        #print(f"Days to expiration: {days_to_exp}")
         
         if days_to_exp <= 0:
             print(f"Warning: Expiration date {expiry_date} is in the past compared to current time {current_time}")
@@ -335,30 +337,38 @@ class GammaChartBuilder:
         for strike in strikes:
             try:
                 call_symbol = self._find_option_symbol(option_symbols, strike, 'C')
-                print(f"Call symbol: {call_symbol}")
+                #print(f"Call symbol: {call_symbol}")
                 put_symbol = self._find_option_symbol(option_symbols, strike, 'P')
+                #print(f"Put symbol: {put_symbol}")
                 
                 # Get implied volatility
                 call_impl_vol = float(data.get(f"{call_symbol}:IMPL_VOL", 0))
-                print(f"Call implied volatility: {call_impl_vol}")
+                #print(f"Call implied volatility: {call_impl_vol}")
                 put_impl_vol = float(data.get(f"{put_symbol}:IMPL_VOL", 0))
-                print(f"Put implied volatility: {put_impl_vol}")
+                #print(f"Put implied volatility: {put_impl_vol}")
                 
                 if days_to_exp <= 0:
                     charm = 0
                 else:
+                    #print(f"underlying_price: {underlying_price}")
+                    #print(f"strike: {float(strike)}")
+                    #print(f"days_to_exp: {days_to_exp/365}")
+                    #print(f"risk_free_rate: {risk_free_rate}")
+                    print(f"div_yield: {div_yield}")
+                    #print(f"call_impl_vol: {call_impl_vol}")
+
                     # Calculate charm for both calls and puts
                     call_charm = calculate_charm(
                         underlying_price, float(strike), days_to_exp/365,
                         risk_free_rate, div_yield, call_impl_vol
                     ) if call_impl_vol > 0 else 0
-                    print(f"Call charm: {call_charm}")
+                    #print(f"Call charm: {call_charm}")
                     
                     put_charm = calculate_charm(
                         underlying_price, float(strike), days_to_exp/365,
                         risk_free_rate, div_yield, put_impl_vol
                     ) if put_impl_vol > 0 else 0
-                    print(f"Put charm: {put_charm}")
+                    #print(f"Put charm: {put_charm}")
                     
                     # Get open interest
                     call_oi = float(data.get(f"{call_symbol}:OPEN_INT", 0))
@@ -366,7 +376,7 @@ class GammaChartBuilder:
                     
                     # Total charm weighted by open interest
                     charm = (call_oi * call_charm + put_oi * put_charm) * 100 * underlying_price
-                    print(f"Total charm Exposure: {charm}")  
+                    #print(f"Total charm Exposure: {charm}")  
                     
                     # Calculate charm separately for calls and puts
                 call_charm_exposure = call_oi * call_charm * 100 * underlying_price

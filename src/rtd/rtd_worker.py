@@ -57,10 +57,7 @@ class RTDWorker:
                             if self.client.subscribe(QuoteType.IMPL_VOL, symbol):
                                 success_count += 1
                                 self.logger.info(f"Subscribed to IMPL_VOL for {symbol}")
-                            if self.client.subscribe(QuoteType.YIELD, symbol):
-                                success_count += 1
-                                self.logger.info(f"Subscribed to YIELD for {symbol}")
-                                
+                                                            
                         else:  # Base symbol
                             # Handle futures symbols by appending exchange if not already present
                             if symbol.startswith('/') and ':' not in symbol:
@@ -75,6 +72,13 @@ class RTDWorker:
                                 if self.client.subscribe(QuoteType.LAST, symbol):
                                     success_count += 1
                                     self.logger.info(f"Successfully subscribed to {symbol}")
+                                    print(f"Successfully subscribed to {symbol}")
+                                try:
+                                    if self.client.subscribe(QuoteType.YIELD, symbol):
+                                        success_count += 1
+                                        self.logger.info(f"Subscribed to YIELD for {symbol}")
+                                except Exception as e:
+                                    print(f"Failed to subscribe to YIELD for {symbol}: {str(e)}")
                         break  # Success, exit retry loop
                     except Exception as sub_error:
                         retry_count += 1

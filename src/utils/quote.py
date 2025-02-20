@@ -23,16 +23,16 @@ class Quote:
         raise ValueError(f"Invalid quote type: {quote_type}")
 
     def _process_value(self, value: Any) -> Any:
-        if value is None or value in ['N/A', '!N/A']:
+        if value is None or value in ['N/A', '!N/A', '--']:
             return None
 
         if self.quote_type in [QuoteType.LAST, QuoteType.BID, QuoteType.ASK, QuoteType.HIGH, QuoteType.LOW, QuoteType.OPEN, QuoteType.CLOSE, QuoteType.MARK, QuoteType.DELTA, QuoteType.GAMMA]:
             return self._to_float(value)
         elif self.quote_type in [QuoteType.VOLUME, QuoteType.ASK_SIZE, QuoteType.BID_SIZE, QuoteType.LAST_SIZE, QuoteType.OPEN_INT]:
             return self._to_int(value)
-        elif self.quote_type == QuoteType.IMPL_VOL:
+        elif self.quote_type == QuoteType.IMPL_VOL or self.quote_type == QuoteType.YIELD:
             float_value = self._to_float(value, percentage=True)
-            return round(float_value, 4) if float_value is not None else None
+            return float_value / 100 if float_value is not None else None
         return value
 
     """ @staticmethod

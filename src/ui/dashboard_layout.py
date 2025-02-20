@@ -20,8 +20,11 @@ class DashboardLayout:
 
     @staticmethod
     def setup_page():
+
+        st.set_page_config(layout='wide') 
+
         """Setup basic page layout"""
-        st.title("Live GEX Dashboard")
+        st.title("Live Dashboard")
         
         # Add sidebar settings
         with st.sidebar:
@@ -59,7 +62,7 @@ class DashboardLayout:
 
     @staticmethod
     def create_input_section():
-        col1, col2, col3, col4, col5, col6, button_col = st.columns([2, 2, 2, 2, 2, 2, 1])
+        col1, col2, col3, col4, col5, col6, button_col = st.columns([2, 2, 2, 2, 2, 3, 1])
 
         with col1:
             symbol = st.text_input("Symbol:", value="SPY").upper()
@@ -76,7 +79,7 @@ class DashboardLayout:
             strike_spacing = st.selectbox(
                 "Strike Spacing",
                 options=[0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 100.0],
-                index=1  # Default to 1.0
+                index=2  # Default to 1.0
             )
         with col5:
             refresh_rate = st.number_input(
@@ -89,7 +92,7 @@ class DashboardLayout:
         with col6:
             chart_type = st.selectbox(
                 "Display Type",
-                options=["GEX", "Charm Exposure", "Open Interest", "Volume"],
+                options=["Gamma Exposure", "Charm Exposure", "Open Interest", "Volume"],
                 index=0
             )
         with button_col:
