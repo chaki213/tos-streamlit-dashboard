@@ -7,3 +7,5 @@ tabulate
 streamlit
 plotly
 yfinance
+scipy
+pytz

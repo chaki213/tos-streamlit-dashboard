@@ -89,7 +89,7 @@ class DashboardLayout:
         with col6:
             chart_type = st.selectbox(
                 "Display Type",
-                options=["GEX", "Open Interest", "Volume"],
+                options=["GEX", "Charm Exposure", "Open Interest", "Volume"],
                 index=0
             )
         with button_col:

@@ -196,7 +196,7 @@ if st.session_state.initialized:
                         if data:
                             fig = st.session_state.chart_builder.create_chart(
                                 data, strikes, st.session_state.option_symbols, 
-                                display_type, graph_type, chart_orientation
+                                display_type, graph_type, chart_orientation, expiry_date
                             )
                             st.session_state.last_figure = fig
                             gamma_chart.plotly_chart(fig, use_container_width=True, key=f"update_chart_{chart_type}_{graph_type}")

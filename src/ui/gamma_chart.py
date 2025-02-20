@@ -1,5 +1,8 @@
 import plotly.graph_objects as go
 from src.utils.option_symbol_builder import OptionSymbolBuilder
+import streamlit as st
+from datetime import datetime
+import pytz
 
 class GammaChartBuilder:
     def __init__(self, symbol: str):
@@ -18,13 +21,19 @@ class GammaChartBuilder:
         self._set_layout(fig, 1, None)  # Use 1 as default range, no price
         return fig
 
-    def create_chart(self, data: dict, strikes: list, option_symbols: list, chart_type: str = "GEX", graph_type: str = "Bar", chart_orientation: str = "Horizontal") -> go.Figure:
-        """Build and return the chart"""
+    def create_chart(self, data: dict, strikes: list, option_symbols: list, chart_type: str = "GEX", graph_type: str = "Bar", chart_orientation: str = "Horizontal", expiry_date=None) -> go.Figure:
+        """Build and return the chart
+        
+        Added expiry_date parameter to pass the expiration date for charm calculations.
+        """
         fig = go.Figure()
         
         if not strikes or not option_symbols:
             print("No strikes or option symbols available")
             return self.create_empty_chart()
+            
+        # Deduplicate strikes while maintaining order
+        strikes = list(dict.fromkeys(strikes))
         
         # Get current price first
         if self.symbol.startswith('/'):
@@ -43,8 +52,13 @@ class GammaChartBuilder:
         # Get appropriate values based on chart type
         vertical = chart_orientation == "Vertical"
         
-        # Get appropriate values based on chart type
-        if chart_type in ["GEX", "Gamma Exposure"]:
+        if chart_type == "Charm Exposure":
+            pos_values, neg_values = self._calculate_charm_values(data, strikes, option_symbols, expiry_date)
+            values_label = "Charm Exposure (Daily Δ Decay)"
+            if pos_values or neg_values:  # Only scale if we have values
+                pos_values = [x/1000000 for x in pos_values]
+                neg_values = [x/1000000 for x in neg_values]
+        elif chart_type in ["GEX", "Gamma Exposure"]:
             pos_values, neg_values = self._calculate_gex_values(data, strikes, option_symbols)
             values_label = "Gamma Exposure ($ per 1% move)"
             if pos_values or neg_values:  # Only scale if we have values
@@ -99,8 +113,6 @@ class GammaChartBuilder:
                     break
                 price_index = i + 0.5
 
-            #print(f"Price index: {price_index}")
-            
             # Add vertical line at the correct position
             fig.add_vline(
                 x=price_index,
@@ -264,6 +276,123 @@ class GammaChartBuilder:
                 call_values.append(0)
                 put_values.append(0)
         return call_values, put_values
+
+    def _calculate_charm_values(self, data, strikes, option_symbols, expiry_date):
+        from src.utils.charm import calculate_charm
+        from datetime import datetime, timezone
+        import pytz
+        pos_charm_values = []
+        neg_charm_values = []
+        
+        try:
+            if self.symbol.startswith('/'):
+                exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(self.symbol, "XCBT")
+                price_key = f"{self.symbol}:{exchange}"
+                underlying_price = float(data.get(f"{price_key}:LAST", 0))
+                div_yield = float(data.get(f"{price_key}:YIELD", 0))  # Already in decimal format 0.0128
+            else:
+                underlying_price = float(data.get(f"{self.symbol}:LAST", 0))
+                div_yield = float(data.get(f"{self.symbol}:YIELD", 0))  # Already in decimal format 0.0128
+            
+        except (ValueError, TypeError):
+            underlying_price = 0
+            div_yield = 0
+            
+        if underlying_price == 0:
+            print("Warning: Underlying price is 0")
+            return [], []
+            
+        risk_free_rate = 0.045  # 4.5% risk-free rate
+        
+        # Get current time in EST
+        est = pytz.timezone('US/Eastern')
+        current_time = datetime.now(est)
+        
+        if not expiry_date:
+            print("Warning: No expiration date available")
+            return [], []
+            
+        # Convert expiry date to datetime at 4:00 PM EST
+        expiry_datetime = datetime.combine(
+            expiry_date,
+            datetime.strptime("16:00", "%H:%M").time()
+        )
+        expiry_datetime = est.localize(expiry_datetime)
+        
+        # Calculate days to expiration
+        time_to_exp = (expiry_datetime - current_time)
+        print(f"Time to expiration: {time_to_exp}")
+        days_to_exp = time_to_exp.total_seconds() / 86400  # Convert total seconds to days
+        
+        print(f"Current time (EST): {current_time}")
+        print(f"Expiry time (EST): {expiry_datetime}")
+        print(f"Days to expiration: {days_to_exp}")
+        
+        if days_to_exp <= 0:
+            print(f"Warning: Expiration date {expiry_date} is in the past compared to current time {current_time}")
+            return [], []
+            
+        for strike in strikes:
+            try:
+                call_symbol = self._find_option_symbol(option_symbols, strike, 'C')
+                print(f"Call symbol: {call_symbol}")
+                put_symbol = self._find_option_symbol(option_symbols, strike, 'P')
+                
+                # Get implied volatility
+                call_impl_vol = float(data.get(f"{call_symbol}:IMPL_VOL", 0))
+                print(f"Call implied volatility: {call_impl_vol}")
+                put_impl_vol = float(data.get(f"{put_symbol}:IMPL_VOL", 0))
+                print(f"Put implied volatility: {put_impl_vol}")
+                
+                if days_to_exp <= 0:
+                    charm = 0
+                else:
+                    # Calculate charm for both calls and puts
+                    call_charm = calculate_charm(
+                        underlying_price, float(strike), days_to_exp/365,
+                        risk_free_rate, div_yield, call_impl_vol
+                    ) if call_impl_vol > 0 else 0
+                    print(f"Call charm: {call_charm}")
+                    
+                    put_charm = calculate_charm(
+                        underlying_price, float(strike), days_to_exp/365,
+                        risk_free_rate, div_yield, put_impl_vol
+                    ) if put_impl_vol > 0 else 0
+                    print(f"Put charm: {put_charm}")
+                    
+                    # Get open interest
+                    call_oi = float(data.get(f"{call_symbol}:OPEN_INT", 0))
+                    put_oi = float(data.get(f"{put_symbol}:OPEN_INT", 0))
+                    
+                    # Total charm weighted by open interest
+                    charm = (call_oi * call_charm + put_oi * put_charm) * 100 * underlying_price
+                    print(f"Total charm Exposure: {charm}")  
+                    
+                    # Calculate charm separately for calls and puts
+                call_charm_exposure = call_oi * call_charm * 100 * underlying_price
+                put_charm_exposure = put_oi * put_charm * 100 * underlying_price
+                
+                # Total charm (keep signs separate)
+                total_charm = call_charm_exposure + put_charm_exposure
+                
+                if total_charm > 0:
+                    pos_charm_values.append(total_charm)
+                    neg_charm_values.append(0)
+                else:
+                    pos_charm_values.append(0)
+                    neg_charm_values.append(total_charm)
+                    
+                print(f"Strike: {strike}")
+                print(f"Call Charm Exposure: {call_charm_exposure}")
+                print(f"Put Charm Exposure: {put_charm_exposure}")
+                print(f"Total Charm: {total_charm}")
+
+            except Exception as e:
+                print(f"Error processing charm for strike {strike}: {str(e)}")
+                pos_charm_values.append(0)
+                neg_charm_values.append(0)
+        
+        return pos_charm_values, neg_charm_values
 
     def _add_traces(self, fig, pos_values, neg_values, strikes, vertical=False, chart_type="GEX", graph_type="Bar"):
         # Determine trace names based on chart type

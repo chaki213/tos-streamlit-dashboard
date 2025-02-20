@@ -54,6 +54,13 @@ class RTDWorker:
                             if self.client.subscribe(QuoteType.VOLUME, symbol):
                                 success_count += 1
                                 self.logger.info(f"Subscribed to VOLUME for {symbol}")
+                            if self.client.subscribe(QuoteType.IMPL_VOL, symbol):
+                                success_count += 1
+                                self.logger.info(f"Subscribed to IMPL_VOL for {symbol}")
+                            if self.client.subscribe(QuoteType.YIELD, symbol):
+                                success_count += 1
+                                self.logger.info(f"Subscribed to YIELD for {symbol}")
+                                
                         else:  # Base symbol
                             # Handle futures symbols by appending exchange if not already present
                             if symbol.startswith('/') and ':' not in symbol:
