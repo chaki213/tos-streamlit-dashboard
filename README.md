@@ -17,9 +17,17 @@ A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 1. Clone the repository
 ```bash
 git clone https://github.com/2187Nick/tos-streamlit-dashboard
+cd tos-streamlit-dashboard
 ```
-2. Install dependencies:
+2. Switch to the charm branch
 ```bash
+git checkout charm
+```
+
+3. Set up Python environment
+```bash
+python -m venv venv
+.\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
