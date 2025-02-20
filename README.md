@@ -54,6 +54,8 @@ Backend:
 
 Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
 
+Charm Exposure Calculations:  [medium article](https://medium.com/option-screener/so-youve-heard-about-gamma-exposure-gex-but-what-about-vanna-and-charm-exposures-47ed9109d26a)
+
 ## Support
 [@2187Nick](https://x.com/2187Nick)
 
@@ -83,3 +85,9 @@ or sell (negative) due to the passage of one day.
 - [ ] IV retrieves "NAN" the further out of the money we go. Calculate IV in that scenario?
 - [ ] Days to expiration is correct? What time do options officially expire?
 - [ ] Add Charm Exposure per hour?
+
+<br />
+<div align="center">
+  <p>Finding value in my work?</p>
+  <a href="https://www.buymeacoffee.com/2187Nick" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+</div>
