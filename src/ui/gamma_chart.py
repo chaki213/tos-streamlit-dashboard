@@ -54,19 +54,19 @@ class GammaChartBuilder:
         
         if chart_type == "Charm Exposure":
             pos_values, neg_values = self._calculate_charm_values(data, strikes, option_symbols, expiry_date)
-            values_label = "Charm Exposure (Daily Δ Decay)"
+            values_label = "Charm Exposure ($ per Daily Δ Decay)"
             if pos_values or neg_values:  # Only scale if we have values
                 pos_values = [x/1000000 for x in pos_values]
                 neg_values = [x/1000000 for x in neg_values]
         elif chart_type == "Vanna Exposure":
             pos_values, neg_values = self._calculate_vanna_values(data, strikes, option_symbols, expiry_date)
-            values_label = "Vanna Exposure (Δ per Vol)"
+            values_label = "Vanna Exposure ($ per 1% Vol Change)"
             if pos_values or neg_values:  # Only scale if we have values
                 pos_values = [x/1000000 for x in pos_values]
                 neg_values = [x/1000000 for x in neg_values]
         elif chart_type in ["GEX", "Gamma Exposure"]:
             pos_values, neg_values = self._calculate_gex_values(data, strikes, option_symbols)
-            values_label = "Gamma Exposure ($ per 1% move)"
+            values_label = "Gamma Exposure ($ per 1% Move)"
             if pos_values or neg_values:  # Only scale if we have values
                 pos_values = [x/1000000 for x in pos_values]
                 neg_values = [x/1000000 for x in neg_values]
@@ -387,6 +387,10 @@ class GammaChartBuilder:
                     # Calculate charm separately for calls and puts
                 call_charm_exposure = call_oi * call_charm * 100 * underlying_price
                 put_charm_exposure = put_oi * put_charm * 100 * underlying_price
+
+                # Test to match convex
+                #call_charm_exposure = call_oi * call_charm * 1000000 * 365
+                #put_charm_exposure = put_oi * put_charm * 1000000 * 365
                 
                 # Total charm (keep signs separate)
                 total_charm = call_charm_exposure + put_charm_exposure
@@ -398,10 +402,12 @@ class GammaChartBuilder:
                     pos_charm_values.append(0)
                     neg_charm_values.append(total_charm)
                     
-                print(f"Strike: {strike}")
-                print(f"Call Charm Exposure: {call_charm_exposure}")
-                print(f"Put Charm Exposure: {put_charm_exposure}")
-                print(f"Total Charm: {total_charm}")
+                #print(f"Strike: {strike}")
+                #print(f"Call charm: {call_charm}")
+                #print(f"Put charm: {put_charm}")
+                #print(f"Call Charm Exposure: {call_charm_exposure}")
+                #print(f"Put Charm Exposure: {put_charm_exposure}")
+                #print(f"Total Charm: {total_charm}")
 
             except Exception as e:
                 print(f"Error processing charm for strike {strike}: {str(e)}")
@@ -486,13 +492,31 @@ class GammaChartBuilder:
                     # Get open interest
                     call_oi = float(data.get(f"{call_symbol}:OPEN_INT", 0))
                     put_oi = float(data.get(f"{put_symbol}:OPEN_INT", 0))
-                    
-                    # Calculate vanna exposure separately for calls and puts
-                    call_vanna_exposure = call_oi * call_vanna * 100 * underlying_price
-                    put_vanna_exposure = put_oi * put_vanna * 100 * underlying_price
+
+
+                    """ Medium Article Formula: Vanna exposure in dollars per 1% change in underlying volatility
+                    call vanna exp = call_oi * call_vanna * Spot * underling Volatility 
+                    put vanna exp = put_oi * put_vanna * Spot * underlying Volatility
+                    Vanna Exposure = call vanna exp + put vanna exp """
+
+                    ## But we might use real IV for each specific strike.
+
+                    # Calculate vanna exposure separately per $1 change in the underlying price ?
+                    #call_vanna_exposure = call_oi * call_vanna * 100 * underlying_price
+                    #put_vanna_exposure = put_oi * put_vanna * 100 * underlying_price
+
+                    # Calculate total vanna exposure per 1% change in volatility
+                    call_vanna_exposure = call_oi * call_vanna * 100 * underlying_price * call_impl_vol
+                    put_vanna_exposure = put_oi * put_vanna * 100 * underlying_price * put_impl_vol
+
+                    # Test to match convex
+                    #call_vanna_exposure = call_oi * call_vanna * 1000000 # * 100 * underlying_price
+                    #put_vanna_exposure = put_oi * put_vanna * 1000000 # * 100 * underlying_price
                     
                     # Total vanna (keep signs separate)
                     total_vanna = call_vanna_exposure + put_vanna_exposure
+
+                    
                     
                 if total_vanna > 0:
                     pos_vanna_values.append(total_vanna)
@@ -500,11 +524,13 @@ class GammaChartBuilder:
                 else:
                     pos_vanna_values.append(0)
                     neg_vanna_values.append(total_vanna)
-                    
-                print(f"Strike: {strike}")
-                print(f"Call Vanna Exposure: {call_vanna_exposure}")
-                print(f"Put Vanna Exposure: {put_vanna_exposure}")
-                print(f"Total Vanna: {total_vanna}")
+                
+                #print(f"Strike: {strike}")
+                #print(f"Call Vanna: {call_vanna}")
+                #print(f"Put Vanna: {put_vanna}")
+                #print(f"Call Vanna Exposure: {call_vanna_exposure}")
+                #print(f"Put Vanna Exposure: {put_vanna_exposure}")
+                #print(f"Total Vanna: {total_vanna}")
 
             except Exception as e:
                 print(f"Error processing vanna for strike {strike}: {str(e)}")

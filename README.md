@@ -1,9 +1,9 @@
-# TOS Streamlit Dashboard w Charm Exposure
+# TOS Streamlit Dashboard w Vanna Exposure
 
 A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 
-## Charm
-![Charm Demo](charm.png)
+## Vanna
+![Vanna Demo](vanna.png)
 
 
 ## Prerequisites
@@ -17,9 +17,17 @@ A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 1. Clone the repository
 ```bash
 git clone https://github.com/2187Nick/tos-streamlit-dashboard
+cd tos-streamlit-dashboard
 ```
-2. Install dependencies:
+2. Switch to the vanna branch
 ```bash
+git checkout vanna
+```
+
+3. Set up Python environment
+```bash
+python -m venv venv
+.\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -45,7 +53,7 @@ streamlit run app.py
 ## Notes
 
 - This does work with Ondemand. Can use this on weekends to review historical data.
-- Gamma values are displayed in millions of dollars per 1% move in underlying asset
+- Vanna values are displayed in millions of dollars per 1% move in Implied Volatility.
 
 ## Credit
 Backend:
@@ -54,37 +62,43 @@ Backend:
 
 Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
 
-Charm Exposure Calculations:  [medium article](https://medium.com/option-screener/so-youve-heard-about-gamma-exposure-gex-but-what-about-vanna-and-charm-exposures-47ed9109d26a)
+Vanna Exposure Calculations:  [medium article](https://medium.com/option-screener/so-youve-heard-about-gamma-exposure-gex-but-what-about-vanna-and-charm-exposures-47ed9109d26a)
 
 ## Support
 [@2187Nick](https://x.com/2187Nick)
 
 [Discord](https://discord.com/invite/vxKepZ6XNC)
 
-## Naive Dealer Charm Exposure. (Need to confirm this is correct):
-Formula: (call OI + put OI) × charm × 100 × underlying_price
+## Naive Dealer Vanna Exposure. (Need to confirm this is correct):
+Formula:
+call vanna exposure = call_oi * call_vanna * 100 * spot * implied volatility
+put vanna exposure = put_oi * put_vanna * 100 * spot * implied volatility
+
+Vanna Exposure = call vanna exposure + put vanna exposure
 
 For calls (dealer long):
 
-OTM calls: Positive charm → dealer buys stock
-ITM calls: Negative charm → dealer buys stock
+OTM calls: Positive vanna → higher vol increases delta → dealer must sell more stock
 
+ITM calls: Negative vanna → higher vol decreases delta → dealer must buy back stock
 
 For puts (dealer short):
 
-OTM puts: Positive charm → dealer buys stock
-ITM puts: Negative charm → dealer buys stock
+OTM puts: Negative vanna → higher vol makes put delta more negative → dealer must sell more stock
 
-The dealer's position (long calls, short puts) combined with the charm effect means
-all components work in the same direction, so we ADD the open interest.
+ITM puts: Positive vanna → higher vol makes put delta less negative → dealer must buy back stock
 
-This formula will give us the dollar value of stock the dealer needs to buy (positive)
-or sell (negative) due to the passage of one day.
+Similar to our delta exposure formula, we use negative signs because:
+
+When dealer is long calls, must hedge by shorting stock
+When dealer is short puts, must hedge by shorting stock
+
+This formula gives us the dollar value of stock the dealer needs to buy (positive) or sell (negative) when volatility changes, to maintain delta neutrality.
 
 ## Issues to address:
 - [ ] IV retrieves "NAN" the further out of the money we go. Calculate IV in that scenario?
 - [ ] Days to expiration is correct? What time do options officially expire?
-- [ ] Add Charm Exposure per hour?
+- [ ] Add Implied Volatility Slider. This will allow us to see how Vanna changes with different IV levels.
 
 <br />
 <div align="center">
