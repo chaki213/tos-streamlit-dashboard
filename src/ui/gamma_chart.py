@@ -58,6 +58,12 @@ class GammaChartBuilder:
             if pos_values or neg_values:  # Only scale if we have values
                 pos_values = [x/1000000 for x in pos_values]
                 neg_values = [x/1000000 for x in neg_values]
+        elif chart_type == "Vanna Exposure":
+            pos_values, neg_values = self._calculate_vanna_values(data, strikes, option_symbols, expiry_date)
+            values_label = "Vanna Exposure (Δ per Vol)"
+            if pos_values or neg_values:  # Only scale if we have values
+                pos_values = [x/1000000 for x in pos_values]
+                neg_values = [x/1000000 for x in neg_values]
         elif chart_type in ["GEX", "Gamma Exposure"]:
             pos_values, neg_values = self._calculate_gex_values(data, strikes, option_symbols)
             values_label = "Gamma Exposure ($ per 1% move)"
@@ -348,13 +354,13 @@ class GammaChartBuilder:
                 #print(f"Put implied volatility: {put_impl_vol}")
                 
                 if days_to_exp <= 0:
-                    charm = 0
+                    total_charm = 0
                 else:
                     #print(f"underlying_price: {underlying_price}")
                     #print(f"strike: {float(strike)}")
                     #print(f"days_to_exp: {days_to_exp/365}")
                     #print(f"risk_free_rate: {risk_free_rate}")
-                    print(f"div_yield: {div_yield}")
+                    #print(f"div_yield: {div_yield}")
                     #print(f"call_impl_vol: {call_impl_vol}")
 
                     # Calculate charm for both calls and puts
@@ -375,7 +381,7 @@ class GammaChartBuilder:
                     put_oi = float(data.get(f"{put_symbol}:OPEN_INT", 0))
                     
                     # Total charm weighted by open interest
-                    charm = (call_oi * call_charm + put_oi * put_charm) * 100 * underlying_price
+                    #charm = (call_oi * call_charm + put_oi * put_charm) * 100 * underlying_price
                     #print(f"Total charm Exposure: {charm}")  
                     
                     # Calculate charm separately for calls and puts
@@ -403,6 +409,109 @@ class GammaChartBuilder:
                 neg_charm_values.append(0)
         
         return pos_charm_values, neg_charm_values
+
+    def _calculate_vanna_values(self, data, strikes, option_symbols, expiry_date):
+        from src.utils.vanna import calculate_vanna
+        from datetime import datetime, timezone
+        import pytz
+        pos_vanna_values = []
+        neg_vanna_values = []
+        
+        try:
+            if self.symbol.startswith('/'):
+                exchange = OptionSymbolBuilder.FUTURES_EXCHANGES.get(self.symbol, "XCBT")
+                price_key = f"{self.symbol}:{exchange}"
+                underlying_price = float(data.get(f"{price_key}:LAST", 0))
+                div_yield = float(data.get(f"{price_key}:YIELD", 0))
+            else:
+                underlying_price = float(data.get(f"{self.symbol}:LAST", 0))
+                div_yield = float(data.get(f"{self.symbol}:YIELD", 0))
+            
+        except (ValueError, TypeError):
+            underlying_price = 0
+            div_yield = 0
+            
+        if underlying_price == 0:
+            print("Warning: Underlying price is 0")
+            return [], []
+            
+        risk_free_rate = 0.045  # 4.5% risk-free rate
+        
+        # Get current time in EST
+        est = pytz.timezone('US/Eastern')
+        current_time = datetime.now(est)
+        
+        if not expiry_date:
+            print("Warning: No expiration date available")
+            return [], []
+            
+        # Convert expiry date to datetime at 4:00 PM EST
+        expiry_datetime = datetime.combine(
+            expiry_date,
+            datetime.strptime("16:00", "%H:%M").time()
+        )
+        expiry_datetime = est.localize(expiry_datetime)
+        
+        # Calculate days to expiration
+        time_to_exp = (expiry_datetime - current_time)
+        days_to_exp = time_to_exp.total_seconds() / 86400
+        
+        if days_to_exp <= 0:
+            print(f"Warning: Expiration date {expiry_date} is in the past")
+            return [], []
+            
+        for strike in strikes:
+            try:
+                call_symbol = self._find_option_symbol(option_symbols, strike, 'C')
+                put_symbol = self._find_option_symbol(option_symbols, strike, 'P')
+                
+                # Get implied volatility
+                call_impl_vol = float(data.get(f"{call_symbol}:IMPL_VOL", 0))
+                put_impl_vol = float(data.get(f"{put_symbol}:IMPL_VOL", 0))
+                
+                if days_to_exp <= 0:
+                    total_vanna = 0
+                else:
+                    # Calculate vanna for both calls and puts
+                    call_vanna = calculate_vanna(
+                        underlying_price, float(strike), days_to_exp/365,
+                        risk_free_rate, div_yield, call_impl_vol
+                    ) if call_impl_vol > 0 else 0
+                    
+                    put_vanna = calculate_vanna(
+                        underlying_price, float(strike), days_to_exp/365,
+                        risk_free_rate, div_yield, put_impl_vol
+                    ) if put_impl_vol > 0 else 0
+                    
+                    # Get open interest
+                    call_oi = float(data.get(f"{call_symbol}:OPEN_INT", 0))
+                    put_oi = float(data.get(f"{put_symbol}:OPEN_INT", 0))
+                    
+                    # Calculate vanna exposure separately for calls and puts
+                    call_vanna_exposure = call_oi * call_vanna * 100 * underlying_price
+                    put_vanna_exposure = put_oi * put_vanna * 100 * underlying_price
+                    
+                    # Total vanna (keep signs separate)
+                    total_vanna = call_vanna_exposure + put_vanna_exposure
+                    
+                if total_vanna > 0:
+                    pos_vanna_values.append(total_vanna)
+                    neg_vanna_values.append(0)
+                else:
+                    pos_vanna_values.append(0)
+                    neg_vanna_values.append(total_vanna)
+                    
+                print(f"Strike: {strike}")
+                print(f"Call Vanna Exposure: {call_vanna_exposure}")
+                print(f"Put Vanna Exposure: {put_vanna_exposure}")
+                print(f"Total Vanna: {total_vanna}")
+
+            except Exception as e:
+                print(f"Error processing vanna for strike {strike}: {str(e)}")
+                pos_vanna_values.append(0)
+                neg_vanna_values.append(0)
+        
+        return pos_vanna_values, neg_vanna_values
 
     def _add_traces(self, fig, pos_values, neg_values, strikes, vertical=False, chart_type="GEX", graph_type="Bar"):
         # Determine trace names based on chart type
