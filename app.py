@@ -24,7 +24,17 @@ if 'initialized' not in st.session_state:
 
 # Setup UI
 pos_color, neg_color, graph_type, chart_orientation = DashboardLayout.setup_page()
+
+# Input section and symbol
 symbol, expiry_date, strike_range, strike_spacing, refresh_rate, chart_type, start_stop_button = DashboardLayout.create_input_section()
+
+# Add TradingView chart
+if symbol.startswith('/'):
+    tv_symbol = f"CME_MINI:{symbol[1:]}"
+else:
+    # Handle NYSE and NASDAQ stocks
+    tv_symbol = f"NYSE:{symbol}" if symbol in ["F", "GM", "GE", "JPM", "BAC", "WFC", "PFE", "T", "KO", "DIS"] else f"NASDAQ:{symbol}"
+DashboardLayout.create_tradingview_chart(tv_symbol)
 
 # Check if chart type changed
 if 'last_chart_type' in st.session_state and st.session_state.last_chart_type != chart_type:

@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import date, timedelta
+import streamlit.components.v1 as components
 
 class DashboardLayout:
     @staticmethod
@@ -117,5 +118,35 @@ class DashboardLayout:
             div.stButton > button {
                 width: 125px;  /* or use 100% for full width */
             }
+            
         </style>
         """
+
+    @staticmethod
+    def create_tradingview_chart(symbol):
+        # Create TradingView Advanced Chart widget
+        tradingview_widget = f"""
+        <div class="tradingview-widget-container">
+            <div id="tradingview_chart"></div>
+            <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+            <script type="text/javascript">
+            new TradingView.widget(
+            {{
+                "width": "100%",
+                "height": "600",
+                "symbol": "{symbol}",
+                "interval": "D",
+                "timezone": "America/New_York",
+                "theme": "dark",
+                "style": "1",
+                "locale": "en",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "hide_side_toolbar": false,
+                "allow_symbol_change": true,
+                "container_id": "tradingview_chart"
+            }});
+            </script>
+        </div>
+        """
+        components.html(tradingview_widget, height=600)
