@@ -30,10 +30,13 @@ symbol, expiry_date, strike_range, strike_spacing, refresh_rate, chart_type, sta
 
 # Add TradingView chart
 if symbol.startswith('/'):
+    # TODO: Handle futures symbols.
+   
     tv_symbol = f"CME_MINI:{symbol[1:]}"
 else:
     # Handle NYSE and NASDAQ stocks
-    tv_symbol = f"NYSE:{symbol}" if symbol in ["F", "GM", "GE", "JPM", "BAC", "WFC", "PFE", "T", "KO", "DIS"] else f"NASDAQ:{symbol}"
+    #tv_symbol = f"NYSE:{symbol}" if symbol in ["F", "GM", "GE", "JPM", "BAC", "WFC", "PFE", "T", "KO", "DIS"] else f"AMEX:{symbol}" if symbol in ["SPY"] else f"NASDAQ:{symbol}"
+    tv_symbol = symbol
 DashboardLayout.create_tradingview_chart(tv_symbol)
 
 # Check if chart type changed

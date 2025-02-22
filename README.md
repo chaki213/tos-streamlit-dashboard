@@ -1,9 +1,9 @@
-# TOS Streamlit Dashboard w Vanna Exposure
+# TOS Streamlit Dashboard w TradingView Chart
 
 A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 
 ## Vanna
-![Vanna Demo](vanna.png)
+![TradingView Demo](tradingview.png)
 
 
 ## Prerequisites
@@ -19,9 +19,9 @@ A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
 git clone https://github.com/2187Nick/tos-streamlit-dashboard
 cd tos-streamlit-dashboard
 ```
-2. Switch to the vanna branch
+2. Switch to the tradingview branch
 ```bash
-git checkout vanna
+git checkout tradingview
 ```
 
 3. Set up Python environment
@@ -53,7 +53,6 @@ streamlit run app.py
 ## Notes
 
 - This does work with Ondemand. Can use this on weekends to review historical data.
-- Vanna values are displayed in millions of dollars per 1% move in Implied Volatility.
 
 ## Credit
 Backend:
@@ -62,43 +61,13 @@ Backend:
 
 Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
 
-Vanna Exposure Calculations:  [medium article](https://medium.com/option-screener/so-youve-heard-about-gamma-exposure-gex-but-what-about-vanna-and-charm-exposures-47ed9109d26a)
-
 ## Support
 [@2187Nick](https://x.com/2187Nick)
 
 [Discord](https://discord.com/invite/vxKepZ6XNC)
 
-## Naive Dealer Vanna Exposure. (Need to confirm this is correct):
-Formula:
-call vanna exposure = call_oi * call_vanna * 100 * spot * implied volatility
-put vanna exposure = put_oi * put_vanna * 100 * spot * implied volatility
-
-Vanna Exposure = call vanna exposure + put vanna exposure
-
-For calls (dealer long):
-
-OTM calls: Positive vanna → higher vol increases delta → dealer must sell more stock
-
-ITM calls: Negative vanna → higher vol decreases delta → dealer must buy back stock
-
-For puts (dealer short):
-
-OTM puts: Negative vanna → higher vol makes put delta more negative → dealer must sell more stock
-
-ITM puts: Positive vanna → higher vol makes put delta less negative → dealer must buy back stock
-
-Similar to our delta exposure formula, we use negative signs because:
-
-When dealer is long calls, must hedge by shorting stock
-When dealer is short puts, must hedge by shorting stock
-
-This formula gives us the dollar value of stock the dealer needs to buy (positive) or sell (negative) when volatility changes, to maintain delta neutrality.
-
 ## Issues to address:
-- [ ] IV retrieves "NAN" the further out of the money we go. Calculate IV in that scenario?
-- [ ] Days to expiration is correct? What time do options officially expire?
-- [ ] Add Implied Volatility Slider. This will allow us to see how Vanna changes with different IV levels.
+- [ ] Can we display RTD data in tradingview chart?
 
 <br />
 <div align="center">
