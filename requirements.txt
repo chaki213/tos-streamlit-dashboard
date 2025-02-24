@@ -6,3 +6,7 @@ PyYAML
 tabulate
 streamlit
 plotly
+pandas
+numpy
+google-generativeai
+python-dotenv

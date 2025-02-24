@@ -1,11 +1,15 @@
-#  app.py
+# app.py
 import time
 import threading
 from queue import Queue
 import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import plotly.graph_objects as go
 from src.rtd.rtd_worker import RTDWorker
-from src.utils.option_symbol_builder import OptionSymbolBuilder
-from src.ui.gamma_chart import GammaChartBuilder
+from src.llm.gemini_analyzer import GeminiAnalyzer
+from src.trading.portfolio import Portfolio
 from src.ui.dashboard_layout import DashboardLayout
 
 # Initialize session state
@@ -14,46 +18,50 @@ if 'initialized' not in st.session_state:
     st.session_state.initialized = False
     st.session_state.data_queue = Queue()
     st.session_state.stop_event = threading.Event()
-    st.session_state.current_price = None
-    st.session_state.option_symbols = []
     st.session_state.active_thread = None
-    st.session_state.last_figure = None
-    st.session_state.loading_complete = False
-    st.session_state.debug_mode = False
+    st.session_state.price_history = pd.DataFrame(columns=['timestamp', 'price'])
+    st.session_state.last_analysis_time = None
+    st.session_state.analysis_interval = 60  # in seconds
+    st.session_state.portfolio = Portfolio(initial_balance=100000)
+    st.session_state.analysis_history = []
+    st.session_state.last_price = None
+    st.session_state.auto_trade = False
 
 # Setup UI
-DashboardLayout.setup_page()
+DashboardLayout.setup_page("LLM Stock Trading Assistant")
 
 # Create control section
-symbol, expiry_date, strike_range, strike_spacing, refresh_rate, start_stop_button = DashboardLayout.create_input_section()
+symbol, analysis_interval, auto_trade, start_stop_button = DashboardLayout.create_input_section()
 
-# Only show metrics section at the top of the page
+# Initialize LLM analyzer
+if 'llm_analyzer' not in st.session_state:
+    st.session_state.llm_analyzer = GeminiAnalyzer()
+
+# Create metrics section
 if st.session_state.initialized:
-    try:
-        last_data = st.session_state.get('last_data', None)
-        if last_data:
-            DashboardLayout.create_metrics_section(last_data)
-        else:
-            DashboardLayout.create_metrics_section()
-    except Exception as e:
-        DashboardLayout.create_metrics_section()
+    current_price = st.session_state.last_price if st.session_state.last_price else 0
+    portfolio = st.session_state.portfolio
+    DashboardLayout.create_metrics_section(
+        current_price=current_price,
+        portfolio_value=portfolio.get_total_value(),
+        portfolio_change=portfolio.get_percent_change(),
+        position=portfolio.get_position_summary(symbol)
+    )
 else:
     DashboardLayout.create_metrics_section()
 
-# Create placeholder for chart
-gamma_chart = st.empty()
+# Create placeholder for charts
+price_chart_container = st.container()
+with price_chart_container:
+    price_chart = st.empty()
 
-# Initialize chart if needed
-if 'chart_builder' not in st.session_state:
-    st.session_state.chart_builder = GammaChartBuilder(symbol)
-    st.session_state.last_figure = st.session_state.chart_builder.create_empty_chart()
+portfolio_chart_container = st.container()
+with portfolio_chart_container:
+    portfolio_chart = st.empty()
 
-if st.session_state.last_figure:
-    chart_height = st.session_state.get('chart_height', 600)
-    gamma_chart.plotly_chart(st.session_state.last_figure, use_container_width=True, height=chart_height, key="main_chart")
-
-# Add insights panel at the bottom
-DashboardLayout.create_insights_panel()
+# Analysis history section
+st.subheader("Analysis History")
+analysis_container = st.container()
 
 # Handle start/stop button clicks
 if start_stop_button:
@@ -70,17 +78,11 @@ if start_stop_button:
         st.session_state.stop_event = threading.Event()
         st.session_state.data_queue = Queue()
         st.session_state.rtd_worker = RTDWorker(st.session_state.data_queue, st.session_state.stop_event)
-        st.session_state.option_symbols = []  # Reset option symbols
+        st.session_state.last_analysis_time = None
+        st.session_state.analysis_interval = analysis_interval
+        st.session_state.auto_trade = auto_trade
         
-        # Only reset chart if symbol changed
-        if 'last_symbol' not in st.session_state or st.session_state.last_symbol != symbol:
-            st.session_state.chart_builder = GammaChartBuilder(symbol)
-            st.session_state.last_figure = st.session_state.chart_builder.create_empty_chart()
-            chart_height = st.session_state.get('chart_height', 600)
-            gamma_chart.plotly_chart(st.session_state.last_figure, use_container_width=True, height=chart_height, key="reset_chart")
-            st.session_state.last_symbol = symbol
-        
-        # Start with stock symbol only to get price first
+        # Start with stock symbol to get price
         try:
             thread = threading.Thread(
                 target=st.session_state.rtd_worker.start,
@@ -96,14 +98,12 @@ if start_stop_button:
             st.error(f"Failed to start RTD worker: {str(e)}")
             st.session_state.initialized = False
     else:
-        # Stop tracking but keep the chart
+        # Stop tracking
         st.session_state.stop_event.set()
         if st.session_state.active_thread:
             st.session_state.active_thread.join(timeout=1.0)
         st.session_state.active_thread = None
         st.session_state.initialized = False
-        st.session_state.loading_complete = False
-        st.session_state.option_symbols = []  # Reset option symbols
         st.rerun()
 
 # Display updates
@@ -116,72 +116,201 @@ if st.session_state.initialized:
                 st.error(data["error"])
             elif "status" not in data:
                 price_key = f"{symbol}:LAST"
-                price = data.get(price_key)
+                current_price = data.get(price_key, 0)
                 
-                # Save the data for metrics display
-                st.session_state.last_data = data
-                
-                if price:
-                    # If we just got the price and don't have option symbols yet,
-                    # restart with all symbols
-                    if not st.session_state.option_symbols:
-                        option_symbols = OptionSymbolBuilder.build_symbols(
-                            symbol, expiry_date, price, strike_range, strike_spacing
+                if current_price and current_price > 0:
+                    # Update price history
+                    now = datetime.now()
+                    new_row = pd.DataFrame([{
+                        'timestamp': now, 
+                        'price': float(current_price)
+                    }])
+                    
+                    st.session_state.price_history = pd.concat([st.session_state.price_history, new_row], ignore_index=True)
+                    st.session_state.last_price = float(current_price)
+                    
+                    # Update price chart
+                    fig = create_price_chart(st.session_state.price_history, symbol)
+                    price_chart.plotly_chart(fig, use_container_width=True)
+                    
+                    # Check if it's time for a new analysis
+                    if (st.session_state.last_analysis_time is None or 
+                        (now - st.session_state.last_analysis_time).total_seconds() >= st.session_state.analysis_interval):
+                        
+                        # Run LLM analysis
+                        analysis_result = st.session_state.llm_analyzer.analyze(
+                            symbol, 
+                            st.session_state.price_history.copy(),
+                            st.session_state.portfolio.get_position(symbol)
                         )
                         
-                        # Stop current thread
-                        st.session_state.stop_event.set()
-                        if st.session_state.active_thread:
-                            st.session_state.active_thread.join(timeout=1.0)
+                        # Record the analysis
+                        analysis_record = {
+                            'timestamp': now,
+                            'price': float(current_price),
+                            'decision': analysis_result['decision'],
+                            'reasoning': analysis_result['reasoning']
+                        }
+                        st.session_state.analysis_history.insert(0, analysis_record)
                         
-                        # Start new thread with all symbols
-                        st.session_state.stop_event = threading.Event()
-                        st.session_state.option_symbols = option_symbols
-                        all_symbols = [symbol] + option_symbols
+                        # Auto-execute trades if enabled
+                        if st.session_state.auto_trade:
+                            if analysis_result['decision'] == 'BUY':
+                                # Buy with 25% of available cash
+                                cash_to_use = st.session_state.portfolio.cash * 0.25
+                                shares_to_buy = int(cash_to_use / current_price)
+                                if shares_to_buy > 0:
+                                    st.session_state.portfolio.buy(symbol, shares_to_buy, current_price)
+                            elif analysis_result['decision'] == 'SELL':
+                                # Sell 50% of current position
+                                position = st.session_state.portfolio.get_position(symbol)
+                                if position['shares'] > 0:
+                                    shares_to_sell = int(position['shares'] * 0.5)
+                                    if shares_to_sell > 0:
+                                        st.session_state.portfolio.sell(symbol, shares_to_sell, current_price)
                         
-                        # Create new RTD worker and thread
-                        st.session_state.rtd_worker = RTDWorker(st.session_state.data_queue, st.session_state.stop_event)
-                        thread = threading.Thread(
-                            target=st.session_state.rtd_worker.start,
-                            args=(all_symbols,),
-                            daemon=True
-                        )
-                        thread.start()
-                        st.session_state.active_thread = thread
-                        time.sleep(0.2)
-                
-                # Update chart
-                if st.session_state.option_symbols:
-                    strikes = []
-                    for sym in st.session_state.option_symbols:
-                        if 'C' in sym:
-                            strike_str = sym.split('C')[-1]
-                            if '.5' in strike_str:
-                                strikes.append(float(strike_str))
-                            else:
-                                strikes.append(int(strike_str))
-                    strikes.sort()
+                        # Update the last analysis time
+                        st.session_state.last_analysis_time = now
                     
-                    # Create and display updated chart
-                    chart_height = st.session_state.get('chart_height', 600)
-                    fig = st.session_state.chart_builder.create_chart(data, strikes, st.session_state.option_symbols)
-                    st.session_state.last_figure = fig
-                    gamma_chart.plotly_chart(fig, use_container_width=True, height=chart_height, key="update_chart")
+                    # Update portfolio chart
+                    portfolio_fig = create_portfolio_chart(st.session_state.portfolio)
+                    portfolio_chart.plotly_chart(portfolio_fig, use_container_width=True)
                     
-                    # Update only the metrics section at the top, not duplicating below chart
-                    if not st.session_state.loading_complete:
-                        st.session_state.loading_complete = True
-                        st.rerun()  # Force a full rerun to update metrics
-                    else:
-                        time.sleep(refresh_rate)
-
-                    if st.session_state.initialized:
-                        st.rerun()
-        else:
-            if st.session_state.initialized:
-                time.sleep(.5)
-                st.rerun()
-                
+                    # Update analysis history
+                    with analysis_container:
+                        for i, analysis in enumerate(st.session_state.analysis_history[:10]):  # Show last 10
+                            with st.expander(
+                                f"{analysis['timestamp'].strftime('%H:%M:%S')} - ${analysis['price']:.2f} - {analysis['decision']}",
+                                expanded=(i == 0)
+                            ):
+                                st.write(analysis['reasoning'])
+        
+        # Rerun to keep updating
+        time.sleep(2)  # Short delay to prevent excessive reruns
+        if st.session_state.initialized:
+            st.rerun()
+            
     except Exception as e:
         st.error(f"Display Error: {str(e)}")
         print(f"Error details: {e}")
+
+def create_price_chart(data, symbol):
+    """Create a price chart with Plotly"""
+    if len(data) < 2:
+        # Create an empty chart if not enough data
+        fig = go.Figure()
+        fig.update_layout(
+            title=f"{symbol} Price",
+            xaxis_title="Time",
+            yaxis_title="Price ($)",
+            height=400
+        )
+        return fig
+    
+    # Create the price chart
+    fig = go.Figure()
+    
+    # Add the price line
+    fig.add_trace(go.Scatter(
+        x=data['timestamp'],
+        y=data['price'],
+        mode='lines',
+        name='Price',
+        line=dict(color='#00BFFF', width=2)
+    ))
+    
+    # Add buy/sell markers if we have analysis history
+    if st.session_state.analysis_history:
+        buys = [a for a in st.session_state.analysis_history if a['decision'] == 'BUY']
+        sells = [a for a in st.session_state.analysis_history if a['decision'] == 'SELL']
+        
+        if buys:
+            buy_times = [b['timestamp'] for b in buys]
+            buy_prices = [b['price'] for b in buys]
+            fig.add_trace(go.Scatter(
+                x=buy_times,
+                y=buy_prices,
+                mode='markers',
+                name='Buy Signal',
+                marker=dict(color='green', size=10, symbol='triangle-up')
+            ))
+            
+        if sells:
+            sell_times = [s['timestamp'] for s in sells]
+            sell_prices = [s['price'] for s in sells]
+            fig.add_trace(go.Scatter(
+                x=sell_times,
+                y=sell_prices,
+                mode='markers',
+                name='Sell Signal',
+                marker=dict(color='red', size=10, symbol='triangle-down')
+            ))
+    
+    # Layout improvements
+    fig.update_layout(
+        title=f"{symbol} Price",
+        xaxis_title="Time",
+        yaxis_title="Price ($)",
+        height=400,
+        template="plotly_dark",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    return fig
+
+def create_portfolio_chart(portfolio):
+    """Create a portfolio value chart with Plotly"""
+    history = portfolio.history
+    
+    if not history:
+        # Create an empty chart if no history
+        fig = go.Figure()
+        fig.update_layout(
+            title="Portfolio Value",
+            xaxis_title="Time",
+            yaxis_title="Value ($)",
+            height=300
+        )
+        return fig
+    
+    # Convert history to DataFrame
+    df = pd.DataFrame(history)
+    
+    # Create the portfolio chart
+    fig = go.Figure()
+    
+    # Add the portfolio value line
+    fig.add_trace(go.Scatter(
+        x=df['timestamp'],
+        y=df['total_value'],
+        mode='lines',
+        name='Portfolio Value',
+        line=dict(color='#32CD32', width=2)
+    ))
+    
+    # Add starting value reference line
+    fig.add_shape(
+        type="line",
+        x0=df['timestamp'].min(),
+        y0=100000,
+        x1=df['timestamp'].max(),
+        y1=100000,
+        line=dict(color="gray", width=1, dash="dash"),
+    )
+    
+    # Layout improvements
+    fig.update_layout(
+        title="Portfolio Value",
+        xaxis_title="Time",
+        yaxis_title="Value ($)",
+        height=300,
+        template="plotly_dark"
+    )
+    
+    return fig

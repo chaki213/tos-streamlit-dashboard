@@ -20,7 +20,6 @@ class RTDWorker:
             if self.initialized:
                 print("Cleaning up previous instance...")
                 self.cleanup()
-                #time.sleep(.2)  # 1 Wait for proper cleanup
                 
             pythoncom.CoInitialize()
             time.sleep(0.1)  # Increased delay for COM initialization
@@ -41,15 +40,9 @@ class RTDWorker:
                 retry_count = 0
                 while retry_count < 3:  # Try up to 3 times
                     try:
-                        if symbol.startswith('.'):
-                            if self.client.subscribe(QuoteType.GAMMA, symbol):
-                                success_count += 1
-                            if self.client.subscribe(QuoteType.OPEN_INT, symbol):
-                                success_count += 1
-                        else:
-                            print(f"Subscribing to LAST for {symbol}")
-                            if self.client.subscribe(QuoteType.LAST, symbol):
-                                success_count += 1
+                        print(f"Subscribing to LAST for {symbol}")
+                        if self.client.subscribe(QuoteType.LAST, symbol):
+                            success_count += 1
                         break  # Success, exit retry loop
                     except Exception as sub_error:
                         retry_count += 1
@@ -68,34 +61,40 @@ class RTDWorker:
             
             message_count = 0
             last_data = {}
+            last_update_time = time.time()
+            update_interval = 2  # Send updates at most every 2 seconds
             
             while not self.stop_event.is_set():
                 pythoncom.PumpWaitingMessages()
                 
-                try:
-                    with self.client._value_lock:
-                        if self.client._latest_values:
-                            current_data = {}
-                            for topic_str, quote in self.client._latest_values.items():
-                                symbol, quote_type = topic_str
-                                key = f"{symbol}:{quote_type}"
-                                current_data[key] = quote.value
-                            
-                            if current_data != last_data:
-                                message_count += 1
-                                while not self.data_queue.empty():
-                                    try:
-                                        self.data_queue.get_nowait()
-                                    except:
-                                        break
+                current_time = time.time()
+                # Only send updates at the specified interval to avoid flooding
+                if current_time - last_update_time >= update_interval:
+                    try:
+                        with self.client._value_lock:
+                            if self.client._latest_values:
+                                current_data = {}
+                                for topic_str, quote in self.client._latest_values.items():
+                                    symbol, quote_type = topic_str
+                                    key = f"{symbol}:{quote_type}"
+                                    current_data[key] = quote.value
                                 
-                                self.data_queue.put(current_data)
-                                last_data = current_data.copy()
-                                
-                except Exception as e:
-                    print(f"Data processing error: {str(e)}")
+                                if current_data != last_data:
+                                    message_count += 1
+                                    while not self.data_queue.empty():
+                                        try:
+                                            self.data_queue.get_nowait()
+                                        except:
+                                            break
+                                    
+                                    self.data_queue.put(current_data)
+                                    last_data = current_data.copy()
+                                    last_update_time = current_time
+                                    
+                    except Exception as e:
+                        print(f"Data processing error: {str(e)}")
                 
-                time.sleep(1)
+                time.sleep(0.2)  # Short sleep to prevent high CPU usage
 
         except Exception as e:
             error_msg = f"RTD Error: {str(e)}"
