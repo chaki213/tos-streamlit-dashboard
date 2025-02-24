@@ -19,10 +19,26 @@ if 'initialized' not in st.session_state:
     st.session_state.active_thread = None
     st.session_state.last_figure = None
     st.session_state.loading_complete = False
+    st.session_state.debug_mode = False
 
 # Setup UI
 DashboardLayout.setup_page()
+
+# Create control section
 symbol, expiry_date, strike_range, strike_spacing, refresh_rate, start_stop_button = DashboardLayout.create_input_section()
+
+# Only show metrics section at the top of the page
+if st.session_state.initialized:
+    try:
+        last_data = st.session_state.get('last_data', None)
+        if last_data:
+            DashboardLayout.create_metrics_section(last_data)
+        else:
+            DashboardLayout.create_metrics_section()
+    except Exception as e:
+        DashboardLayout.create_metrics_section()
+else:
+    DashboardLayout.create_metrics_section()
 
 # Create placeholder for chart
 gamma_chart = st.empty()
@@ -33,15 +49,22 @@ if 'chart_builder' not in st.session_state:
     st.session_state.last_figure = st.session_state.chart_builder.create_empty_chart()
 
 if st.session_state.last_figure:
-    gamma_chart.plotly_chart(st.session_state.last_figure, use_container_width=True, key="main_chart")
+    chart_height = st.session_state.get('chart_height', 600)
+    gamma_chart.plotly_chart(st.session_state.last_figure, use_container_width=True, height=chart_height, key="main_chart")
+
+# Add insights panel at the bottom
+DashboardLayout.create_insights_panel()
 
 # Handle start/stop button clicks
 if start_stop_button:
     if not st.session_state.initialized:
+        # Show loading state
+        DashboardLayout.show_loading_state()
+        
         # Clean stop any existing thread
         if st.session_state.active_thread:
             st.session_state.stop_event.set()
-            st.session_state.active_thread.join(timeout=2.0)  # Increased timeout
+            st.session_state.active_thread.join(timeout=2.0)
         
         # Reset state
         st.session_state.stop_event = threading.Event()
@@ -53,7 +76,8 @@ if start_stop_button:
         if 'last_symbol' not in st.session_state or st.session_state.last_symbol != symbol:
             st.session_state.chart_builder = GammaChartBuilder(symbol)
             st.session_state.last_figure = st.session_state.chart_builder.create_empty_chart()
-            gamma_chart.plotly_chart(st.session_state.last_figure, use_container_width=True, key="reset_chart")
+            chart_height = st.session_state.get('chart_height', 600)
+            gamma_chart.plotly_chart(st.session_state.last_figure, use_container_width=True, height=chart_height, key="reset_chart")
             st.session_state.last_symbol = symbol
         
         # Start with stock symbol only to get price first
@@ -75,12 +99,11 @@ if start_stop_button:
         # Stop tracking but keep the chart
         st.session_state.stop_event.set()
         if st.session_state.active_thread:
-            st.session_state.active_thread.join(timeout=1.0)  # Increased timeout
+            st.session_state.active_thread.join(timeout=1.0)
         st.session_state.active_thread = None
         st.session_state.initialized = False
         st.session_state.loading_complete = False
         st.session_state.option_symbols = []  # Reset option symbols
-        #time.sleep(1)  # Add delay before allowing restart
         st.rerun()
 
 # Display updates
@@ -94,6 +117,9 @@ if st.session_state.initialized:
             elif "status" not in data:
                 price_key = f"{symbol}:LAST"
                 price = data.get(price_key)
+                
+                # Save the data for metrics display
+                st.session_state.last_data = data
                 
                 if price:
                     # If we just got the price and don't have option symbols yet,
@@ -136,12 +162,16 @@ if st.session_state.initialized:
                                 strikes.append(int(strike_str))
                     strikes.sort()
                     
+                    # Create and display updated chart
+                    chart_height = st.session_state.get('chart_height', 600)
                     fig = st.session_state.chart_builder.create_chart(data, strikes, st.session_state.option_symbols)
                     st.session_state.last_figure = fig
-                    gamma_chart.plotly_chart(fig, use_container_width=True, key="update_chart")
-
+                    gamma_chart.plotly_chart(fig, use_container_width=True, height=chart_height, key="update_chart")
+                    
+                    # Update only the metrics section at the top, not duplicating below chart
                     if not st.session_state.loading_complete:
                         st.session_state.loading_complete = True
+                        st.rerun()  # Force a full rerun to update metrics
                     else:
                         time.sleep(refresh_rate)
 
