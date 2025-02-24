@@ -12,6 +12,127 @@ from src.llm.gemini_analyzer import GeminiAnalyzer
 from src.trading.portfolio import Portfolio
 from src.ui.dashboard_layout import DashboardLayout
 
+def create_price_chart(data, symbol):
+    """Create a price chart with Plotly"""
+    if len(data) < 2:
+        # Create an empty chart if not enough data
+        fig = go.Figure()
+        fig.update_layout(
+            title=f"{symbol} Price",
+            xaxis_title="Time",
+            yaxis_title="Price ($)",
+            height=400
+        )
+        return fig
+    
+    # Create the price chart
+    fig = go.Figure()
+    
+    # Add the price line
+    fig.add_trace(go.Scatter(
+        x=data['timestamp'],
+        y=data['price'],
+        mode='lines',
+        name='Price',
+        line=dict(color='#00BFFF', width=2)
+    ))
+    
+    # Add buy/sell markers if we have analysis history
+    if st.session_state.analysis_history:
+        buys = [a for a in st.session_state.analysis_history if a['decision'] == 'BUY']
+        sells = [a for a in st.session_state.analysis_history if a['decision'] == 'SELL']
+        
+        if buys:
+            buy_times = [b['timestamp'] for b in buys]
+            buy_prices = [b['price'] for b in buys]
+            fig.add_trace(go.Scatter(
+                x=buy_times,
+                y=buy_prices,
+                mode='markers',
+                name='Buy Signal',
+                marker=dict(color='green', size=10, symbol='triangle-up')
+            ))
+            
+        if sells:
+            sell_times = [s['timestamp'] for s in sells]
+            sell_prices = [s['price'] for s in sells]
+            fig.add_trace(go.Scatter(
+                x=sell_times,
+                y=sell_prices,
+                mode='markers',
+                name='Sell Signal',
+                marker=dict(color='red', size=10, symbol='triangle-down')
+            ))
+    
+    # Layout improvements
+    fig.update_layout(
+        title=f"{symbol} Price",
+        xaxis_title="Time",
+        yaxis_title="Price ($)",
+        height=400,
+        template="plotly_dark",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    return fig
+
+def create_portfolio_chart(portfolio):
+    """Create a portfolio value chart with Plotly"""
+    history = portfolio.history
+    
+    if not history:
+        # Create an empty chart if no history
+        fig = go.Figure()
+        fig.update_layout(
+            title="Portfolio Value",
+            xaxis_title="Time",
+            yaxis_title="Value ($)",
+            height=300
+        )
+        return fig
+    
+    # Convert history to DataFrame
+    df = pd.DataFrame(history)
+    
+    # Create the portfolio chart
+    fig = go.Figure()
+    
+    # Add the portfolio value line
+    fig.add_trace(go.Scatter(
+        x=df['timestamp'],
+        y=df['total_value'],
+        mode='lines',
+        name='Portfolio Value',
+        line=dict(color='#32CD32', width=2)
+    ))
+    
+    # Add starting value reference line
+    fig.add_shape(
+        type="line",
+        x0=df['timestamp'].min(),
+        y0=100000,
+        x1=df['timestamp'].max(),
+        y1=100000,
+        line=dict(color="gray", width=1, dash="dash"),
+    )
+    
+    # Layout improvements
+    fig.update_layout(
+        title="Portfolio Value",
+        xaxis_title="Time",
+        yaxis_title="Value ($)",
+        height=300,
+        template="plotly_dark"
+    )
+    
+    return fig
+
 # Initialize session state
 if 'initialized' not in st.session_state:
     print("Initializing")
@@ -193,124 +314,3 @@ if st.session_state.initialized:
     except Exception as e:
         st.error(f"Display Error: {str(e)}")
         print(f"Error details: {e}")
-
-def create_price_chart(data, symbol):
-    """Create a price chart with Plotly"""
-    if len(data) < 2:
-        # Create an empty chart if not enough data
-        fig = go.Figure()
-        fig.update_layout(
-            title=f"{symbol} Price",
-            xaxis_title="Time",
-            yaxis_title="Price ($)",
-            height=400
-        )
-        return fig
-    
-    # Create the price chart
-    fig = go.Figure()
-    
-    # Add the price line
-    fig.add_trace(go.Scatter(
-        x=data['timestamp'],
-        y=data['price'],
-        mode='lines',
-        name='Price',
-        line=dict(color='#00BFFF', width=2)
-    ))
-    
-    # Add buy/sell markers if we have analysis history
-    if st.session_state.analysis_history:
-        buys = [a for a in st.session_state.analysis_history if a['decision'] == 'BUY']
-        sells = [a for a in st.session_state.analysis_history if a['decision'] == 'SELL']
-        
-        if buys:
-            buy_times = [b['timestamp'] for b in buys]
-            buy_prices = [b['price'] for b in buys]
-            fig.add_trace(go.Scatter(
-                x=buy_times,
-                y=buy_prices,
-                mode='markers',
-                name='Buy Signal',
-                marker=dict(color='green', size=10, symbol='triangle-up')
-            ))
-            
-        if sells:
-            sell_times = [s['timestamp'] for s in sells]
-            sell_prices = [s['price'] for s in sells]
-            fig.add_trace(go.Scatter(
-                x=sell_times,
-                y=sell_prices,
-                mode='markers',
-                name='Sell Signal',
-                marker=dict(color='red', size=10, symbol='triangle-down')
-            ))
-    
-    # Layout improvements
-    fig.update_layout(
-        title=f"{symbol} Price",
-        xaxis_title="Time",
-        yaxis_title="Price ($)",
-        height=400,
-        template="plotly_dark",
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
-    )
-    
-    return fig
-
-def create_portfolio_chart(portfolio):
-    """Create a portfolio value chart with Plotly"""
-    history = portfolio.history
-    
-    if not history:
-        # Create an empty chart if no history
-        fig = go.Figure()
-        fig.update_layout(
-            title="Portfolio Value",
-            xaxis_title="Time",
-            yaxis_title="Value ($)",
-            height=300
-        )
-        return fig
-    
-    # Convert history to DataFrame
-    df = pd.DataFrame(history)
-    
-    # Create the portfolio chart
-    fig = go.Figure()
-    
-    # Add the portfolio value line
-    fig.add_trace(go.Scatter(
-        x=df['timestamp'],
-        y=df['total_value'],
-        mode='lines',
-        name='Portfolio Value',
-        line=dict(color='#32CD32', width=2)
-    ))
-    
-    # Add starting value reference line
-    fig.add_shape(
-        type="line",
-        x0=df['timestamp'].min(),
-        y0=100000,
-        x1=df['timestamp'].max(),
-        y1=100000,
-        line=dict(color="gray", width=1, dash="dash"),
-    )
-    
-    # Layout improvements
-    fig.update_layout(
-        title="Portfolio Value",
-        xaxis_title="Time",
-        yaxis_title="Value ($)",
-        height=300,
-        template="plotly_dark"
-    )
-    
-    return fig

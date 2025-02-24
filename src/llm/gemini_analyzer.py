@@ -1,21 +1,27 @@
 # src/llm/gemini_analyzer.py
 import os
-import google.generativeai as genai
-from datetime import datetime, timedelta
+import dotenv
 import pandas as pd
+from google import genai
+from google.genai import types
+from datetime import datetime, timedelta
+
+# Load environment variables
+dotenv.load_dotenv()
 
 class GeminiAnalyzer:
     def __init__(self, api_key=None):
         """Initialize Gemini API connection"""
         # Try to get API key from environment variable if not provided
-        self.api_key = api_key or os.environ.get('GEMINI_API_KEY')
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         
         if not self.api_key:
             print("Warning: No Gemini API key found. Please set GEMINI_API_KEY environment variable.")
             self.client = None
         else:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+            # Initialize Gemini client
+            self.client = genai.Client(api_key=self.api_key)
+            #self.model = self.client.get_model("gemini-2.0-flash") # self.model = self.client.model.GenerativeModel('gemini-2.0-flash') 
     
     def analyze(self, symbol, price_history, position=None):
         """
@@ -72,8 +78,11 @@ REASONING: [Your detailed analysis explaining your decision]
         
         try:
             # Get response from Gemini
-            response = self.model.generate_content(prompt)
+            #response = self.model.generate_content(prompt)
+            response =  self.client.models.generate_content(model='gemini-2.0-flash',
+            contents=prompt)
             text = response.text
+            print(f"Gemini response: {text}")
             
             # Parse the response
             decision, reasoning = self._parse_response(text)

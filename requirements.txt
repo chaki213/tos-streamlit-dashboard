@@ -8,5 +8,5 @@ streamlit
 plotly
 pandas
 numpy
-google-generativeai
+google-genai
 python-dotenv
