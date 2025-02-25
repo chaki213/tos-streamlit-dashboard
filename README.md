@@ -1,6 +1,6 @@
-# LLM-Powered Stock Trading Assistant
+# LLM-Powered Stock Trader
 
-A real-time stock trading assistant that uses LLM (Gemini) to analyze market data and make trading decisions.
+A real-time stock trader that uses LLMs (Gemini) to analyze market data and make trading decisions.
 
 ## Features
 
@@ -10,22 +10,24 @@ A real-time stock trading assistant that uses LLM (Gemini) to analyze market dat
 - Trading history and decision logs
 - Optional auto-execution of trades based on LLM recommendations
 
-## Demo Screenshot
+## Demo
 
-[Screenshot coming soon]
+![LLM Trader Screenshot 1](llm_1.png)
+![LLM Trader Screenshot 2](llm_2.png)
+![LLM Trader Screenshot 3](llm_3.png)
 
 ## Prerequisites
 
 - Windows OS (required for ThinkorSwim RTD)
 - Python 3.11+
 - ThinkorSwim desktop application installed and running
-- Gemini API key (get one at https://ai.google.dev/)
+- Gemini API key (get one at https://aistudio.google.com/)
 
 ## Installation
 
 1. Clone the repository
 ```bash
-git clone https://github.com/2187Nick/llm-trading-assistant
+git clone https://github.com/2187Nick/llm-trader
 ```
 
 2. Install dependencies:
@@ -65,9 +67,8 @@ streamlit run app.py
 
 ## Notes
 
-- This is for educational purposes only. Use at your own risk.
+- This is for educational and back testing purposes only. Use at your own risk.
 - The LLM analysis is based only on recent price movements and does not incorporate fundamental analysis, news, or other market factors.
-- Auto-trading uses simple rules (buys with 25% of available cash, sells 50% of position)
 
 ## Build On This
 
@@ -83,13 +84,9 @@ Some ideas for extending this project:
 - If you build something, share it and we can keep a directory of projects.
 
 ## Credits
-This project was built upon the TOS-Streamlit-Dashboard by [@2187Nick](https://x.com/2187Nick)
-
 Backend:
 
-[@FollowerOfFlow](https://x.com/FollowerOfFlow) worked some magic to get TOS RTD working directly with Python.
-
-Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
+[Pyrtdc](https://github.com/tifoji/pyrtdc/)
 
 
 ## Support
