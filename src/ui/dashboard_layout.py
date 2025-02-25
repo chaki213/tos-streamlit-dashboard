@@ -1,6 +1,6 @@
 # src/ui/dashboard_layout.py
 import streamlit as st
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
 class DashboardLayout:
     @staticmethod
@@ -26,18 +26,18 @@ class DashboardLayout:
         with st.container():
             st.markdown('<div class="control-panel-header">Trading Controls</div>', unsafe_allow_html=True)
             
-            # Create two rows of controls for better organization
-            row1_cols = st.columns([2, 2, 2, 2])
+            # Create columns for better organization
+            col1, col2 = st.columns(2)
             
-            # First row controls
-            with row1_cols[0]:
+            # Trading controls
+            with col1:
+                st.markdown("### Basic Settings")
                 symbol = st.text_input(
                     "Symbol",
                     value="SPY",
                     help="Enter the ticker symbol (e.g., SPY, AAPL, MSFT)"
                 ).upper()
                 
-            with row1_cols[1]:
                 analysis_interval = st.number_input(
                     "Analysis Interval (sec)",
                     value=60,
@@ -47,34 +47,85 @@ class DashboardLayout:
                     help="How often to analyze price data and make decisions"
                 )
                 
-            with row1_cols[2]:
                 auto_trade = st.checkbox(
                     "Auto-Execute Trades",
                     value=False,
                     help="Automatically execute trades based on LLM recommendations"
                 )
-                
-            with row1_cols[3]:
-                # Improved button with icon
-                toggle_button = st.button(
-                    "Pause" if st.session_state.initialized else "Start Trading",
-                    type="primary" if not st.session_state.initialized else "secondary",
-                    use_container_width=True,
-                    key="start_stop_button"
+            
+            # OnDemand controls
+            with col2:
+                st.markdown("### OnDemand Settings")
+                use_on_demand = st.checkbox(
+                    "Use TOS OnDemand",
+                    value=False,
+                    help="Use historical data from ThinkorSwim OnDemand mode"
                 )
+                
+                on_demand_col1, on_demand_col2 = st.columns([3, 1])
+                
+                with on_demand_col1:
+                    start_date = st.date_input(
+                        "Start Date",
+                        value=datetime.now().date() - timedelta(days=7),
+                        disabled=not use_on_demand,
+                        help="Date to begin historical data analysis"
+                    )
+                    
+                with on_demand_col2:
+                    start_time = st.time_input(
+                        "Start Time",
+                        value=datetime.strptime("09:30", "%H:%M").time(),
+                        disabled=not use_on_demand,
+                        help="Time to begin historical data analysis"
+                    )
+                
+                speed_factor = st.slider(
+                    "Replay Speed",
+                    min_value=1.0,
+                    max_value=10.0,
+                    value=1.0,
+                    step=0.5,
+                    disabled=not use_on_demand,
+                    help="Speed multiplier for historical data replay"
+                )
+            
+            # Create start/stop button
+            toggle_button = st.button(
+                "Pause" if hasattr(st.session_state, 'initialized') and st.session_state.initialized else "Start Trading",
+                type="primary" if not hasattr(st.session_state, 'initialized') or not st.session_state.initialized else "secondary",
+                use_container_width=True,
+                key="start_stop_button"
+            )
         
-        # Add a status indicator
-        if st.session_state.initialized:
-            st.markdown('<div class="status-indicator active">LIVE TRADING</div>', unsafe_allow_html=True)
+        # Combine date and time for OnDemand
+        on_demand_settings = None
+        if use_on_demand:
+            start_datetime = datetime.combine(start_date, start_time)
+            on_demand_settings = {
+                'use_on_demand': use_on_demand,
+                'start_time': start_datetime,
+                'speed_factor': speed_factor
+            }
+        
+        # Add a status indicator and display OnDemand info if active
+        if hasattr(st.session_state, 'initialized') and st.session_state.initialized:
+            if hasattr(st.session_state, 'use_on_demand') and st.session_state.use_on_demand:
+                # OnDemand status
+                current_time = st.session_state.simulated_time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(st.session_state, 'simulated_time') else "N/A"
+                st.markdown(f'<div class="status-indicator active">ONDEMAND MODE - Current Time: {current_time} (Speed: {st.session_state.speed_factor}x)</div>', unsafe_allow_html=True)
+            else:
+                # Live status
+                st.markdown('<div class="status-indicator active">LIVE TRADING</div>', unsafe_allow_html=True)
         else:
             st.markdown('<div class="status-indicator inactive">INACTIVE</div>', unsafe_allow_html=True)
             
-        return symbol, analysis_interval, auto_trade, toggle_button
+        return symbol, analysis_interval, auto_trade, toggle_button, on_demand_settings
 
     @staticmethod
     def create_metrics_section(current_price=None, portfolio_value=None, portfolio_change=None, position=None):
         """Create a metrics section to display key statistics"""
-        if current_price is None or not st.session_state.initialized:
+        if current_price is None or not hasattr(st.session_state, 'initialized') or not st.session_state.initialized:
             # Default placeholder metrics when not initialized
             cols = st.columns(4)
             with cols[0]:
@@ -330,6 +381,23 @@ class DashboardLayout:
             
             .js-plotly-plot .plotly .bg {
                 fill: rgba(30, 30, 30, 0.8) !important;
+            }
+            
+            /* OnDemand mode styling */
+            .ondemand-active {
+                background-color: rgba(100, 149, 237, 0.2);
+                color: #60b4ff;
+                border: 1px solid rgba(100, 149, 237, 0.4);
+                padding: 5px 10px;
+                border-radius: 5px;
+                margin: 10px 0;
+            }
+            
+            /* Section headers */
+            h3 {
+                color: #60b4ff !important;
+                font-size: 1.1rem !important;
+                margin-bottom: 15px !important;
             }
         </style>
         """

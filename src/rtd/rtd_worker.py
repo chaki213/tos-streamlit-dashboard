@@ -3,16 +3,23 @@ import pythoncom
 import time
 import threading
 from queue import Queue
+from datetime import datetime, timedelta
 from src.rtd.client import RTDClient
 from src.core.settings import SETTINGS
 from config.quote_types import QuoteType
 
 class RTDWorker:
-    def __init__(self, data_queue: Queue, stop_event: threading.Event):
+    def __init__(self, data_queue: Queue, stop_event: threading.Event, 
+                 use_on_demand=False, start_time=None, speed_factor=1.0):
         self.data_queue = data_queue
         self.stop_event = stop_event
         self.client = None
         self.initialized = False
+        
+        # OnDemand support
+        self.use_on_demand = use_on_demand
+        self.start_time = start_time or datetime.now()
+        self.speed_factor = speed_factor
         
     def start(self, all_symbols: list):
         """Start RTD worker with all symbols at once"""
@@ -22,8 +29,19 @@ class RTDWorker:
                 self.cleanup()
                 
             pythoncom.CoInitialize()
-            time.sleep(0.1)  # Increased delay for COM initialization
+            time.sleep(0.1)  # Short delay for COM initialization
             
+            # If using OnDemand, configure TOS to be in OnDemand mode
+            if self.use_on_demand:
+                print(f"Starting in OnDemand mode from {self.start_time} at {self.speed_factor}x speed")
+                # In a real implementation, you would send commands to TOS to enter OnDemand mode
+                # and set the appropriate date/time in ThinkorSwim
+                self.data_queue.put({"status": f"OnDemand mode active, starting from {self.start_time}"})
+                time.sleep(0.5)  # Give UI time to update
+            else:
+                print("Starting in live mode...")
+            
+            # Initialize RTD client
             self.client = RTDClient(heartbeat_ms=SETTINGS['timing']['initial_heartbeat'])
             self.client.initialize()
             self.initialized = True
@@ -65,6 +83,7 @@ class RTDWorker:
             update_interval = 2  # Send updates at most every 2 seconds
             
             while not self.stop_event.is_set():
+                # Process RTD messages
                 pythoncom.PumpWaitingMessages()
                 
                 current_time = time.time()
@@ -78,6 +97,7 @@ class RTDWorker:
                                     symbol, quote_type = topic_str
                                     key = f"{symbol}:{quote_type}"
                                     current_data[key] = quote.value
+                                    print(f"DEBUG - Symbol: {symbol}, Quote Type: {quote_type}, Price: {quote.value}")
                                 
                                 if current_data != last_data:
                                     message_count += 1

@@ -14,7 +14,7 @@ class Portfolio:
         # Record initial state
         self._record_portfolio_value()
     
-    def buy(self, symbol, shares, price):
+    def buy(self, symbol, shares, price, timestamp=None):
         """Buy shares of a stock"""
         cost = shares * price
         if cost > self.cash:
@@ -48,7 +48,7 @@ class Portfolio:
             
         # Record the transaction
         transaction = {
-            'timestamp': datetime.now(),
+            'timestamp': timestamp or datetime.now(),
             'type': 'BUY',
             'symbol': symbol,
             'shares': shares,
@@ -58,11 +58,11 @@ class Portfolio:
         self.transactions.append(transaction)
         
         # Update portfolio value
-        self._record_portfolio_value()
+        self._record_portfolio_value(timestamp)
         
         return True
     
-    def sell(self, symbol, shares, price):
+    def sell(self, symbol, shares, price, timestamp=None):
         """Sell shares of a stock"""
         if symbol not in self.positions or self.positions[symbol]['shares'] < shares:
             return False
@@ -83,7 +83,7 @@ class Portfolio:
             
         # Record the transaction
         transaction = {
-            'timestamp': datetime.now(),
+            'timestamp': timestamp or datetime.now(),
             'type': 'SELL',
             'symbol': symbol,
             'shares': shares,
@@ -93,7 +93,7 @@ class Portfolio:
         self.transactions.append(transaction)
         
         # Update portfolio value
-        self._record_portfolio_value()
+        self._record_portfolio_value(timestamp)
         
         return True
     
@@ -129,10 +129,10 @@ class Portfolio:
             
         return f"{position['shares']} shares @ ${position['cost_basis']:.2f}"
     
-    def update_prices(self, prices_dict):
+    def update_prices(self, prices_dict, timestamp=None):
         """Update last known prices for all positions"""
         self.last_prices = prices_dict
-        self._record_portfolio_value()
+        self._record_portfolio_value(timestamp)
     
     def get_total_value(self):
         """Calculate total portfolio value"""
@@ -155,10 +155,10 @@ class Portfolio:
         change = ((current_value - self.initial_balance) / self.initial_balance) * 100
         return change
     
-    def _record_portfolio_value(self):
+    def _record_portfolio_value(self, timestamp=None):
         """Record current portfolio value for historical tracking"""
         snapshot = {
-            'timestamp': datetime.now(),
+            'timestamp': timestamp or datetime.now(),
             'cash': self.cash,
             'investments': self.get_total_value() - self.cash,
             'total_value': self.get_total_value()

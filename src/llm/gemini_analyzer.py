@@ -2,9 +2,9 @@
 import os
 import dotenv
 import pandas as pd
+from datetime import datetime, timedelta
 from google import genai
 from google.genai import types
-from datetime import datetime, timedelta
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -21,9 +21,8 @@ class GeminiAnalyzer:
         else:
             # Initialize Gemini client
             self.client = genai.Client(api_key=self.api_key)
-            #self.model = self.client.get_model("gemini-2.0-flash") # self.model = self.client.model.GenerativeModel('gemini-2.0-flash') 
     
-    def analyze(self, symbol, price_history, position=None):
+    def analyze(self, symbol, price_history, position=None, is_ondemand=False):
         """
         Analyze price data and make a trading decision
         
@@ -31,6 +30,7 @@ class GeminiAnalyzer:
             symbol: Stock symbol
             price_history: DataFrame with timestamp and price columns
             position: Current position information (optional)
+            is_ondemand: Whether we're in OnDemand/historical mode
             
         Returns:
             Dictionary with decision and reasoning
@@ -54,10 +54,20 @@ class GeminiAnalyzer:
         # Format position information
         position_info = self._format_position_info(position)
         
+        # Add context for OnDemand mode
+        mode_context = ""
+        if is_ondemand and len(price_history) > 0:
+            latest_timestamp = price_history['timestamp'].max()
+            mode_context = f"""
+You are analyzing historical market data from {latest_timestamp.strftime('%Y-%m-%d')}. 
+Use only the provided price data for your analysis, as if you were making this decision in real-time on that date.
+Do not use future knowledge beyond this date.
+"""
+        
         # Create the prompt
         prompt = f"""
 You are a financial analyst and trading assistant. Analyze the recent price data for {symbol} and make a trading decision (BUY, SELL, or HOLD).
-
+{mode_context}
 Recent price data (timestamps are in descending order - newest first):
 {price_data}
 
@@ -78,8 +88,7 @@ REASONING: [Your detailed analysis explaining your decision]
         
         try:
             # Get response from Gemini
-            #response = self.model.generate_content(prompt)
-            response =  self.client.models.generate_content(model='gemini-2.0-flash',
+            response = self.client.models.generate_content(model='gemini-2.0-flash',
             contents=prompt)
             text = response.text
             print(f"Gemini response: {text}")
@@ -113,7 +122,7 @@ REASONING: [Your detailed analysis explaining your decision]
         # Format as string
         formatted_data = ""
         for i, row in df.iterrows():
-            time_str = row['timestamp'].strftime('%H:%M:%S')
+            time_str = row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
             price_str = f"${row['price']:.2f}"
             
             if i < len(df) - 1:
