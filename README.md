@@ -27,15 +27,22 @@ A real-time stock trader that uses LLMs (Gemini) to analyze market data and make
 
 1. Clone the repository
 ```bash
-git clone https://github.com/2187Nick/llm-trader
+git clone https://github.com/2187Nick/tos-streamlit-dashboard
+cd tos-streamlit-dashboard
+```
+2. Switch to the tradingview branch
+```bash
+git checkout llm_trader
 ```
 
-2. Install dependencies:
+3. Set up Python environment
 ```bash
+python -m venv venv
+.\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-3. Create a `.env` file with your Gemini API key:
+4. Create a `.env` file with your Gemini API key:
 ```
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
