@@ -6,3 +6,7 @@ PyYAML
 tabulate
 streamlit
 plotly
+pythoncom
+Pillow
+numpy
+scipy

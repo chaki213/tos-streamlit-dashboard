@@ -18,7 +18,6 @@ class RTDWorker:
         """Start RTD worker with all symbols at once"""
         try:
             if self.initialized:
-                print("Cleaning up previous instance...")
                 self.cleanup()
                 #time.sleep(.2)  # 1 Wait for proper cleanup
                 
@@ -30,7 +29,6 @@ class RTDWorker:
             self.initialized = True
             
             if not all_symbols:
-                print("No symbols provided!")
                 return
                 
             success_count = 0
@@ -42,12 +40,18 @@ class RTDWorker:
                 while retry_count < 3:  # Try up to 3 times
                     try:
                         if symbol.startswith('.'):
-                            if self.client.subscribe(QuoteType.GAMMA, symbol):
-                                success_count += 1
-                            if self.client.subscribe(QuoteType.OPEN_INT, symbol):
-                                success_count += 1
+                            # Subscribe to all required option Greeks for vanna and charm calculations
+                            option_quote_types = [
+                                QuoteType.GAMMA,     # For existing GEX calculation
+                                QuoteType.OPEN_INT,  # For existing GEX calculation  
+                                QuoteType.DELTA,     # For vanna and charm calculations
+                                QuoteType.VEGA,      # For vanna calculation
+                                QuoteType.THETA      # For charm calculation
+                            ]
+                            for quote_type in option_quote_types:
+                                if self.client.subscribe(quote_type, symbol):
+                                    success_count += 1
                         else:
-                            print(f"Subscribing to LAST for {symbol}")
                             if self.client.subscribe(QuoteType.LAST, symbol):
                                 success_count += 1
                         break  # Success, exit retry loop
@@ -56,14 +60,12 @@ class RTDWorker:
                         if retry_count == 3:
                             error_msg = f"Failed to subscribe to {symbol} after 3 attempts: {str(sub_error)}"
                             subscription_errors.append(error_msg)
-                            print(error_msg)
                         time.sleep(0.1)  # Short delay between retries
             
             if subscription_errors:
                 self.data_queue.put({"error": "\n".join(subscription_errors)})
                 return
 
-            print(f"Successfully subscribed to {success_count} topics")
             time.sleep(0.3)  # Wait for subscriptions to settle
             
             message_count = 0
@@ -93,28 +95,25 @@ class RTDWorker:
                                 last_data = current_data.copy()
                                 
                 except Exception as e:
-                    print(f"Data processing error: {str(e)}")
+                    pass
                 
                 time.sleep(1)
 
         except Exception as e:
             error_msg = f"RTD Error: {str(e)}"
-            print(error_msg)
             self.data_queue.put({"error": error_msg})
         finally:
             self.cleanup()
-            print("RTDWorker cleanup complete")
 
     def cleanup(self):
         if self.client:
             try:
-                print("Disconnecting RTDClient...")
                 self.client.Disconnect()
                 self.client = None
             except Exception as e:
-                print(f"Error during disconnect: {str(e)}")
+                pass
         try:
             pythoncom.CoUninitialize()
         except Exception as e:
-            print(f"Error during CoUninitialize: {str(e)}")
+            pass
         self.initialized = False

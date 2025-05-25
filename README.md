@@ -1,10 +1,18 @@
 # TOS Streamlit Dashboard
 
-A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit.
+A real-time dashboard using ThinkorSwim's RTD (Real-Time Data) and Streamlit with Gamma Exposure, Vanna, and Charm analysis.
 
 ## Demo
 https://github.com/user-attachments/assets/1d6446e0-5c49-4208-872f-f63a55da36a5
 
+## Features
+
+- **Real-time Gamma Exposure**: Live gamma exposure calculations and visualization
+- **Vanna Analysis**: Real-time vanna exposure charts (volatility risk)
+- **Charm Analysis**: Real-time charm exposure charts (time decay risk)
+- **Black-Scholes Greeks**: Automatic calculation when RTD data unavailable
+- **Dynamic Charts**: Switch between Gamma, Vanna, and Charm histograms
+- **Live Data**: Direct integration with ThinkorSwim RTD feed
 
 ## Prerequisites
 
@@ -17,35 +25,79 @@ https://github.com/user-attachments/assets/1d6446e0-5c49-4208-872f-f63a55da36a5
 1. Clone the repository
 ```bash
 git clone https://github.com/2187Nick/tos-streamlit-dashboard
+cd tos-streamlit-dashboard
 ```
-2. Install dependencies:
+
+2. Create and activate virtual environment:
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-1. Start ThinkorSwim desktop application and log in
-2. Run the dashboard:
+1. **Start ThinkorSwim** desktop application and log in
+
+2. **Run the dashboard**:
 ```bash
+# Using virtual environment (recommended)
+.\.venv\Scripts\streamlit.exe run app.py
+
+# Alternative if streamlit is globally installed
 streamlit run app.py
 ```
-3. Open the browser and navigate to `http://localhost:8501`
+
+3. **Open browser** and navigate to `http://localhost:8501`
 
 ## Interface Controls
 
-
+### Basic Settings
 - **Symbol**: Ticker symbol (e.g., "SPY")
-- **Expiry Date**:  Contract expiration date (Defaults to the nearest Friday)
-- **Strike Range**: Range of strikes to monitor (Defaults to +- $10)
-- **Strike Spacing**: Spacing between strikes (Defaults to 1)
-- **Refresh Rate**: Data refresh rate (Defaults to 15 seconds)
-- **Start/Stop**: Toggle data streaming
+- **Expiry Date**: Contract expiration date (Defaults to the nearest Friday)
+- **Strike Range**: Range of strikes to monitor (Defaults to ±$20)
+- **Strike Spacing**: Spacing between strikes (0.5, 1.0, 2.5, 5.0, 10.0, 25.0)
+- **Refresh Rate**: Data refresh rate in seconds (1-300)
+- **Start/Pause**: Toggle data streaming
+
+### Chart Types
+- **Default**: Gamma Exposure (green/red histogram)
+- **Vanna**: Vanna exposure chart (purple histogram) - volatility risk
+- **Charm**: Charm exposure chart (orange histogram) - time decay risk
+
+*Note: Only one chart type can be selected at a time*
+
+## Chart Features
+
+- **Color-coded totals** in chart title
+- **Real-time calculations** using Black-Scholes when needed
+- **Strike annotations** showing max exposure levels
+- **Current price line** indicator
+- **Automatic scaling** in millions of dollars
 
 ## Notes
 
-- This does work with Ondemand. Can use this on weekends to review historical data.
-- Gamma values are displayed in millions of dollars per 1% move in underlying asset.
+- Works with ThinkorSwim OnDemand for historical data analysis
+- Exposure values displayed in millions of dollars
+- Greeks calculated per 1% move in underlying asset (Gamma), 1% volatility move (Vanna), or per day (Charm)
+- Real-time Black-Scholes calculation when RTD Greek data unavailable
+
+## Troubleshooting
+
+### "streamlit not recognized" error:
+Use the virtual environment executable:
+```bash
+.\.venv\Scripts\streamlit.exe run app.py
+```
+
+### No data appearing:
+1. Ensure ThinkorSwim is running and logged in
+2. Check that the symbol and expiry date are valid
+3. Verify market hours or use OnDemand mode
 
 ## Build
 - This repo is a basic example. We hope you will build upon it and make it your own.
@@ -58,7 +110,9 @@ Backend:
 
 Check it out here: [pyrtdc](https://github.com/tifoji/pyrtdc/)
 
-Gamma Exposure Calculations:  [perfiliev](https://perfiliev.com/blog/how-to-calculate-gamma-exposure-and-zero-gamma-level/)
+Gamma Exposure Calculations: [perfiliev](https://perfiliev.com/blog/how-to-calculate-gamma-exposure-and-zero-gamma-level/)
+
+Black-Scholes Greeks Implementation: Built-in mathematical calculations for accurate option analytics
 
 ## Support
 [@2187Nick](https://x.com/2187Nick)

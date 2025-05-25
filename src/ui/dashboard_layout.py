@@ -40,7 +40,7 @@ class DashboardLayout:
                 format="MM/DD/YYYY"
             )
         with col3:
-            strike_range = st.number_input("Strike Range $(±)", value=10, min_value=1, max_value=500)
+            strike_range = st.number_input("Strike Range $(±)", value=20, min_value=1, max_value=500)
         with col4:
             strike_spacing = st.selectbox(
                 "Strike Spacing",
@@ -50,7 +50,7 @@ class DashboardLayout:
         with col5:
             refresh_rate = st.number_input(
                 "Refresh Rate (s)",
-                value=15,
+                value=5,
                 min_value=1,
                 max_value=300,
                 help="Chart refresh interval in seconds"
@@ -64,7 +64,26 @@ class DashboardLayout:
             )
             st.markdown('</div>', unsafe_allow_html=True)
 
-        return symbol, expiry_date, strike_range, strike_spacing, round(refresh_rate/2), toggle_button
+        # Add chart type controls in a new row
+        chart_col1, chart_col2, chart_col3 = st.columns([1, 1, 4])
+        
+        with chart_col1:
+            show_vanna = st.checkbox(
+                "Vanna",
+                value=False
+            )
+        
+        with chart_col2:
+            show_charm = st.checkbox(
+                "Charm", 
+                value=False
+            )
+        
+        with chart_col3:
+            # Removed the overlay help text
+            pass
+
+        return symbol, expiry_date, strike_range, strike_spacing, round(refresh_rate/2), toggle_button, show_vanna, show_charm
 
     @staticmethod
     def _get_custom_css():

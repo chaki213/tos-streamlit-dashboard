@@ -10,7 +10,6 @@ from src.ui.dashboard_layout import DashboardLayout
 
 # Initialize session state
 if 'initialized' not in st.session_state:
-    print("Initializing")
     st.session_state.initialized = False
     st.session_state.data_queue = Queue()
     st.session_state.stop_event = threading.Event()
@@ -22,15 +21,56 @@ if 'initialized' not in st.session_state:
 
 # Setup UI
 DashboardLayout.setup_page()
-symbol, expiry_date, strike_range, strike_spacing, refresh_rate, start_stop_button = DashboardLayout.create_input_section()
+symbol, expiry_date, strike_range, strike_spacing, refresh_rate, start_stop_button, show_vanna, show_charm = DashboardLayout.create_input_section()
 
 # Create placeholder for chart
 gamma_chart = st.empty()
 
 # Initialize chart if needed
 if 'chart_builder' not in st.session_state:
-    st.session_state.chart_builder = GammaChartBuilder(symbol)
+    st.session_state.chart_builder = GammaChartBuilder(symbol, expiry_date)
     st.session_state.last_figure = st.session_state.chart_builder.create_empty_chart()
+
+# Update chart builder if symbol or expiry date changed
+if ('last_symbol' not in st.session_state or st.session_state.last_symbol != symbol or
+    'last_expiry' not in st.session_state or st.session_state.last_expiry != expiry_date):
+    st.session_state.chart_builder = GammaChartBuilder(symbol, expiry_date)
+    st.session_state.last_symbol = symbol
+    st.session_state.last_expiry = expiry_date
+
+# Track overlay state changes
+if 'last_vanna_state' not in st.session_state:
+    st.session_state.last_vanna_state = False
+if 'last_charm_state' not in st.session_state:
+    st.session_state.last_charm_state = False
+
+# Check if overlay states changed
+overlay_changed = (show_vanna != st.session_state.last_vanna_state or 
+                  show_charm != st.session_state.last_charm_state)
+
+if overlay_changed:
+    st.session_state.last_vanna_state = show_vanna
+    st.session_state.last_charm_state = show_charm
+    
+    # Force chart refresh if we have data
+    if st.session_state.option_symbols and st.session_state.last_figure:
+        # Get the latest data from session state or create dummy data for immediate refresh
+        if hasattr(st.session_state, 'latest_data'):
+            strikes = []
+            for sym in st.session_state.option_symbols:
+                if 'C' in sym:
+                    strike_str = sym.split('C')[-1]
+                    if '.5' in strike_str:
+                        strikes.append(float(strike_str))
+                    else:
+                        strikes.append(int(strike_str))
+            strikes.sort()
+            
+            fig = st.session_state.chart_builder.create_chart(
+                st.session_state.latest_data, strikes, st.session_state.option_symbols, show_vanna, show_charm
+            )
+            st.session_state.last_figure = fig
+            gamma_chart.plotly_chart(fig, use_container_width=True, key=f"overlay_update_{show_vanna}_{show_charm}")
 
 if st.session_state.last_figure:
     gamma_chart.plotly_chart(st.session_state.last_figure, use_container_width=True, key="main_chart")
@@ -51,7 +91,7 @@ if start_stop_button:
         
         # Only reset chart if symbol changed
         if 'last_symbol' not in st.session_state or st.session_state.last_symbol != symbol:
-            st.session_state.chart_builder = GammaChartBuilder(symbol)
+            st.session_state.chart_builder = GammaChartBuilder(symbol, expiry_date)
             st.session_state.last_figure = st.session_state.chart_builder.create_empty_chart()
             gamma_chart.plotly_chart(st.session_state.last_figure, use_container_width=True, key="reset_chart")
             st.session_state.last_symbol = symbol
@@ -126,6 +166,9 @@ if st.session_state.initialized:
                 
                 # Update chart
                 if st.session_state.option_symbols:
+                    # Store latest data for overlay updates
+                    st.session_state.latest_data = data
+                    
                     strikes = []
                     for sym in st.session_state.option_symbols:
                         if 'C' in sym:
@@ -136,7 +179,7 @@ if st.session_state.initialized:
                                 strikes.append(int(strike_str))
                     strikes.sort()
                     
-                    fig = st.session_state.chart_builder.create_chart(data, strikes, st.session_state.option_symbols)
+                    fig = st.session_state.chart_builder.create_chart(data, strikes, st.session_state.option_symbols, show_vanna, show_charm)
                     st.session_state.last_figure = fig
                     gamma_chart.plotly_chart(fig, use_container_width=True, key="update_chart")
 
@@ -154,4 +197,3 @@ if st.session_state.initialized:
                 
     except Exception as e:
         st.error(f"Display Error: {str(e)}")
-        print(f"Error details: {e}")
